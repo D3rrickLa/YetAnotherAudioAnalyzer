@@ -1,67 +1,101 @@
-🩵 Phase 1 — MVP (Minimum Viable Product)
+# Roadmap
+## Phase 1 - MVP (Minimum Viable Product)
 
 Goal: Core functionality — must be stable, efficient, and visually clear.
 
 ✅ Core Features
 
-Spectrum Analyzer
+1. Spectrum Analyzer
 
-Real-time FFT (JUCE dsp::FFT)
+  - Real-time FFT (JUCE dsp::FFT)
+  
+  - Adjustable resolution and smoothing
+  
+  - Log frequency scaling
 
-Adjustable resolution and smoothing
+  - Averaging modes: instantaneous / short-term / long-term
 
-Log frequency scaling
+2. Stereo Correlation Meter
 
-Averaging modes: instantaneous / short-term / long-term
+  - Real-time correlation (−1 → +1)
+  
+  - Visual feedback: bar or circular indicator
+  
+  - Optional numeric readout
 
-Stereo Correlation Meter
+3. Stereo Width Visualizer
 
-Real-time correlation (−1 → +1)
+  - L/R balance and width vector display
+  
+  - Optional “phase dot” cloud visualization (Ozone Imager style)
 
-Visual feedback: bar or circular indicator
+4. LUFS Meter
 
-Optional numeric readout
+  - Integrated loudness module using ITU-R BS.1770-4
+  
+  - Real-time short-term (LUFS-S), momentary, and integrated loudness
+  
+  - K-weighted RMS algorithm
+  
+  - Simple horizontal bar or numerical display
+  
+  - Clip / over indicator (if >0 LUFS)
+  
+  - Optional “target zone” overlay (e.g., −14 LUFS streaming standard)
 
-Stereo Width Visualizer
+5. Mono / Stereo A/B Toggle
 
-L/R balance and width vector display
+  - One-click mono fold-down
+  
+  - Optional timed A/B loop test (stereo ↔ mono every X seconds)
+  
+  - Works pre-meter (affects visual + audio)
+  
+6. Freeze / Snapshot
 
-Optional “phase dot” cloud visualization (Ozone Imager style)
+  - Hold spectrum, correlation, and LUFS readings
+  
+  - Compare against current playback visually
+  
+7. Lightweight UI
 
-LUFS Meter
+  - Modular panels: Spectrum / Correlation / LUFS
+  
+  - Resizable layout
+  
+  - Efficient OpenGL rendering
+  
+  - Flat minimal aesthetic (like SPAN + Ozone hybrid)
 
-Integrated loudness module using ITU-R BS.1770-4
 
-Real-time short-term (LUFS-S), momentary, and integrated loudness
+## Phase 2 - Advanced Metering & Personalization
+1. Multi-Band Correlation
+2. Reference Track Overlay
+3. RMS + Peak overlay on Spectrum
+4. Hotkeys (M, Space, Tab)
+5. Custom Color Themes / Layouts
+6. Session Presets (Save Layouts)
+7. Refined Loudness Target Panel
+  - User-selectable presets: Spotify (−14), YouTube (−13), Apple (−16)
+  - Overshoot highlighting (color flash when exceeding target)
 
-K-weighted RMS algorithm
+## Phase 3 - Professional / Expansion Features
+1. Mid/Side Spectrum & Correlation
+2. External Side-chain / Reference Compare
+3. A/B Snapshot Compare (full plugin state)
+4. Compact “HUD” Mode
+5. Standalone Version
+6. DAW-linked Transport Integration
+7. Batch Loudness Analysis (offline mode)
 
-Simple horizontal bar or numerical display
+---
+| Milestone | Deliverable                        | Target |
+| --------- | ---------------------------------- | ------ |
+| M1        | JUCE setup + FFT base              | Week 1 |
+| M2        | Correlation + Stereo panel         | Week 2 |
+| M3        | LUFS Meter (Momentary, Short-Term) | Week 3 |
+| M4        | Mono A/B + Freeze                  | Week 4 |
+| M5        | UI polish + Beta build             | Week 5 |
+| M6        | Public Beta (MVP Release)          | Week 6 |
+| M7        | Feedback + Phase 2 design          | Week 8 |
 
-Clip / over indicator (if >0 LUFS)
-
-Optional “target zone” overlay (e.g., −14 LUFS streaming standard)
-
-Mono / Stereo A/B Toggle
-
-One-click mono fold-down
-
-Optional timed A/B loop test (stereo ↔ mono every X seconds)
-
-Works pre-meter (affects visual + audio)
-
-Freeze / Snapshot
-
-Hold spectrum, correlation, and LUFS readings
-
-Compare against current playback visually
-
-Lightweight UI
-
-Modular panels: Spectrum / Correlation / LUFS
-
-Resizable layout
-
-Efficient OpenGL rendering
-
-Flat minimal aesthetic (like SPAN + Ozone hybrid)
