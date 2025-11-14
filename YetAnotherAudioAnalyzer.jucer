@@ -4,7 +4,12 @@
               useAppConfig="0" addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1"
               pluginFormats="buildVST3" pluginVST3Category="Mastering,Tools">
   <MAINGROUP id="hmDvap" name="YetAnotherAudioAnalyzer">
-    <GROUP id="{1A7B91DB-DB62-9BB9-557A-6D40F234BAA0}" name="DSP"/>
+    <GROUP id="{1A7B91DB-DB62-9BB9-557A-6D40F234BAA0}" name="DSP">
+      <FILE id="QKpRh4" name="SpectrumAnalyzer.cpp" compile="1" resource="0"
+            file="Source/DSP/SpectrumAnalyzer.cpp"/>
+      <FILE id="GhTaDy" name="SpectrumAnalyzer.h" compile="0" resource="0"
+            file="Source/DSP/SpectrumAnalyzer.h"/>
+    </GROUP>
     <GROUP id="{653736E4-9553-FB18-37D9-EBB38A92E4E8}" name="Source">
       <FILE id="nJXmpH" name="PluginProcessor.cpp" compile="1" resource="0"
             file="Source/PluginProcessor.cpp"/>
