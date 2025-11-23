@@ -5,10 +5,20 @@
               pluginFormats="buildVST3" pluginVST3Category="Mastering,Tools">
   <MAINGROUP id="hmDvap" name="YetAnotherAudioAnalyzer">
     <GROUP id="{1A7B91DB-DB62-9BB9-557A-6D40F234BAA0}" name="DSP">
+      <FILE id="J5qLSC" name="CorrelationMeter.cpp" compile="1" resource="0"
+            file="Source/DSP/CorrelationMeter.cpp"/>
+      <FILE id="Flyg0i" name="CorrelationMeter.h" compile="0" resource="0"
+            file="Source/DSP/CorrelationMeter.h"/>
+      <FILE id="czeMV0" name="LevelMeter.cpp" compile="1" resource="0" file="Source/DSP/LevelMeter.cpp"/>
+      <FILE id="Em779f" name="LevelMeter.h" compile="0" resource="0" file="Source/DSP/LevelMeter.h"/>
       <FILE id="QKpRh4" name="SpectrumAnalyzer.cpp" compile="1" resource="0"
             file="Source/DSP/SpectrumAnalyzer.cpp"/>
       <FILE id="GhTaDy" name="SpectrumAnalyzer.h" compile="0" resource="0"
             file="Source/DSP/SpectrumAnalyzer.h"/>
+      <FILE id="mfanTr" name="StereoWidthVisualizer.cpp" compile="1" resource="0"
+            file="Source/DSP/StereoWidthVisualizer.cpp"/>
+      <FILE id="T2LxLr" name="StereoWidthVisualizer.h" compile="0" resource="0"
+            file="Source/DSP/StereoWidthVisualizer.h"/>
     </GROUP>
     <GROUP id="{653736E4-9553-FB18-37D9-EBB38A92E4E8}" name="Source">
       <FILE id="nJXmpH" name="PluginProcessor.cpp" compile="1" resource="0"

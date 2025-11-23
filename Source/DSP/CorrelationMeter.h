@@ -9,3 +9,12 @@
 */
 
 #pragma once
+class CorrelationMeter
+{
+public:
+	CorrelationMeter();
+	~CorrelationMeter();
+
+private:
+
+};

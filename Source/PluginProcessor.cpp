@@ -95,6 +95,8 @@ void YetAnotherAudioAnalyzerAudioProcessor::prepareToPlay (double sampleRate, in
 {
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
+    spectrumAnalyzerL.prepareToPlay(sampleRate);
+    spectrumAnalyzerR.prepareToPlay(sampleRate);
 }
 
 void YetAnotherAudioAnalyzerAudioProcessor::releaseResources()
@@ -131,31 +133,50 @@ bool YetAnotherAudioAnalyzerAudioProcessor::isBusesLayoutSupported (const BusesL
 
 void YetAnotherAudioAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
-    juce::ScopedNoDenormals noDenormals;
-    auto totalNumInputChannels  = getTotalNumInputChannels();
-    auto totalNumOutputChannels = getTotalNumOutputChannels();
+    //juce::ScopedNoDenormals noDenormals;
+    //auto totalNumInputChannels  = getTotalNumInputChannels();
+    //auto totalNumOutputChannels = getTotalNumOutputChannels();
 
-    // In case we have more outputs than inputs, this code clears any output
-    // channels that didn't contain input data, (because these aren't
-    // guaranteed to be empty - they may contain garbage).
-    // This is here to avoid people getting screaming feedback
-    // when they first compile a plugin, but obviously you don't need to keep
-    // this code if your algorithm always overwrites all the output channels.
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-        buffer.clear (i, 0, buffer.getNumSamples());
+    //// In case we have more outputs than inputs, this code clears any output
+    //// channels that didn't contain input data, (because these aren't
+    //// guaranteed to be empty - they may contain garbage).
+    //// This is here to avoid people getting screaming feedback
+    //// when they first compile a plugin, but obviously you don't need to keep
+    //// this code if your algorithm always overwrites all the output channels.
+    //for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
+    //    buffer.clear (i, 0, buffer.getNumSamples());
 
-    // This is the place where you'd normally do the guts of your plugin's
-    // audio processing...
-    // Make sure to reset the state if your inner loop is processing
-    // the samples and the outer loop is handling the channels.
-    // Alternatively, you can process the samples with the channels
-    // interleaved by keeping the same state.
-    for (int channel = 0; channel < totalNumInputChannels; ++channel)
+    //// This is the place where you'd normally do the guts of your plugin's
+    //// audio processing...
+    //// Make sure to reset the state if your inner loop is processing
+    //// the samples and the outer loop is handling the channels.
+    //// Alternatively, you can process the samples with the channels
+    //// interleaved by keeping the same state.
+    //for (int channel = 0; channel < totalNumInputChannels; ++channel)
+    //{
+    //    auto* channelData = buffer.getWritePointer (channel);
+
+    //    // ..do something to the data...
+    //}
+
+    //juce::ScopedLock sl(lock);
+
+    int numSamples = buffer.getNumSamples();
+    spectrumAnalyzerL.pushAudioBlock(buffer.getReadPointer(0), numSamples);
+    spectrumAnalyzerL.computeFFT();
+
+    if (getTotalNumInputChannels() > 1)
     {
-        auto* channelData = buffer.getWritePointer (channel);
-
-        // ..do something to the data...
+        spectrumAnalyzerR.pushAudioBlock(buffer.getReadPointer(1), numSamples);
+        spectrumAnalyzerR.computeFFT();
     }
+
+    // Optionally update GUI
+    //if (editor != nullptr)
+    //{
+    //    editor->updateSpectrum(spectrumAnalyzerL.getMagnitude(),
+    //        spectrumAnalyzerR.getMagnitude());
+    //}
 }
 
 //==============================================================================
