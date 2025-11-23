@@ -10,6 +10,7 @@
 
 #include <JuceHeader.h>
 #include "DSP/SpectrumAnalyzer.h"
+#include "DSP/CorrelationMeter.h"
 
 //==============================================================================
 /**
@@ -54,12 +55,14 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
+    PluginEditor* editor = nullptr;
 private:
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(YetAnotherAudioAnalyzerAudioProcessor);
 
     SpectrumAnalyzer spectrumAnalyzerL;
     SpectrumAnalyzer spectrumAnalyzerR;
+    CorrelationMeter correlationMeter;
 
 
 };
