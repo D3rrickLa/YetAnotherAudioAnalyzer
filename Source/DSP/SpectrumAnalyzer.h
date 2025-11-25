@@ -5,7 +5,7 @@
 
 /*
 should be just a helper class that handles FFTs, magnitudes, and any spectrum-specific state. 
-It doesn’t need to inherit from AudioProcessor. It just needs methods to push audio blocks in and compute the FFT.
+It doesnâ€™t need to inherit from AudioProcessor. It just needs methods to push audio blocks in and compute the FFT.
 */
 class SpectrumAnalyzer
 {
