@@ -65,12 +65,12 @@ public:
     StereoWidthVisualizer& getStereoWidthMeter() { return stereoWidthMeter; }
 private:
     //==============================================================================
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(YetAnotherAudioAnalyzerAudioProcessor);
-
     SpectrumAnalyzer spectrumAnalyzerL;
     SpectrumAnalyzer spectrumAnalyzerR;
     CorrelationMeter correlationMeter;
     LevelMeter levelMeter;
     StereoWidthVisualizer stereoWidthMeter;
 
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(YetAnotherAudioAnalyzerAudioProcessor)
 };

@@ -16,14 +16,14 @@ public:
     void prepareToPlay(double sampleRate, int samplePerBlock);
     void SpectrumAnalyzer::pushAudioBlock(const float* input, int numSamples);
     void computeFFT();
-    const juce::HeapBlock<float>& getMagnitude() const { return magnitude; }
+    const std::vector<float>& getMagnitude() const { return magnitude; }
 
 private:
     int fftOrder;
     int fftSize;
     juce::dsp::FFT fft;
-    juce::HeapBlock<float> fftData;
-    juce::HeapBlock<float> magnitude;
+    std::vector<float> fftData;
+    std::vector<float> magnitude;
     int fifoIndex = 0;
     juce::CriticalSection lock;
 };

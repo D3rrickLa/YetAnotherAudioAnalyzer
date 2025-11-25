@@ -10,32 +10,12 @@
 
 #pragma once
 #include <JuceHeader.h>
-
-
-/*
-    Integrated LUFS need 
-        1. K-weight filter, a fixed biquad cascade defined by EBU R128
-            - high pass at 40 Hz
-            - high shelf around 4 kHz
-        2. channel weighting for 2-channel stereo
-        3. Gate
-            - absolute gate at -70 LUFS
-            - relative gate (current ungated loudness) at -10 LUFS
-            - only do the accumlation for blocks that pass these gates
-
-        4. Block energy accumlation
-            - use 400 ms block
-            for each block
-                - run through the k-filters, computer average power, convert to LUFS, apply gates. If it passes, accumlatet the total energy and time
-*/
 // Lightweight, thread-safe LUFS (Integrated) meter implementation for JUCE.
 // - Uses 400 ms analysis blocks
 // - Applies a K-weighting approximation (HP + high-shelf) using JUCE IIR filters
 // - Implements absolute (-70 LUFS) and relative (-10 LU) gates per EBU R128 / ITU-R BS.1770
 // - Accumulates energy only from blocks that pass gating
 // - Exposes public API suitable for calling from audio thread and reading from GUI thread
-
-
 class LevelMeter
 {
 public:
@@ -65,7 +45,7 @@ public:
     // Return whether integrated value is valid (i.e. we've accumulated gated audio)
     bool hasIntegratedLufs() const noexcept;
 
-    double static epsValue() { return EPS; };
+    double epsValue();
 
 private:
     void finalizeBlock(); // called when 400 ms block completes

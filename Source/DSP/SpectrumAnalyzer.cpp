@@ -1,16 +1,18 @@
 #include "SpectrumAnalyzer.h"
 
-SpectrumAnalyzer::SpectrumAnalyzer(int fftOrder) : fftOrder(fftOrder), fftSize(1 << fftOrder), fft(fftOrder)
+SpectrumAnalyzer::SpectrumAnalyzer(int fftOrder)     : fftOrder(fftOrder),
+      fftSize(1 << fftOrder),
+      fft(fftOrder)
 {
-	fftData.calloc(2 * fftSize); // FFT needs 2x space for RT+imag
+    fftData.resize(2 * fftSize, 0.0f);  // FFT needs 2x space for RT+imag
 }
 
 void SpectrumAnalyzer::prepareToPlay(double sampleRate, int samplePerBlock)
 {
     juce::ignoreUnused(sampleRate);
     fifoIndex = 0;
-    zeromem(fftData, sizeof(float) * 2 * fftSize);
-    zeromem(magnitude, sizeof(float) * fftSize / 2);
+    fftData.resize(2 * fftSize, 0.0f);          // allocate and zero
+    magnitude.resize(fftSize / 2, 0.0f);        // allocate and zero
 }
 
 void SpectrumAnalyzer::pushAudioBlock(const float* input, int numSamples)
@@ -27,7 +29,7 @@ void SpectrumAnalyzer::pushAudioBlock(const float* input, int numSamples)
 void SpectrumAnalyzer::computeFFT()
 {
     const juce::ScopedLock sl(lock);
-    fft.performRealOnlyForwardTransform(fftData);
+    fft.performRealOnlyForwardTransform(fftData.data());
     for (int i = 0; i < fftSize / 2; ++i)
     {
         const float re = fftData[i * 2];

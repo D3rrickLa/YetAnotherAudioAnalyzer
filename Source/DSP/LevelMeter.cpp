@@ -9,82 +9,13 @@
 */
 
 
-#pragma once
-
-#include "LevelMeter.h"
-#include <JuceHeader.h>
-
-// Lightweight, thread-safe LUFS (Integrated) meter implementation for JUCE.
-// - Uses 400 ms analysis blocks
-// - Applies a K-weighting approximation (HP + high-shelf) using JUCE IIR filters
-// - Implements absolute (-70 LUFS) and relative (-10 LU) gates per EBU R128 / ITU-R BS.1770
-// - Accumulates energy only from blocks that pass gating
-// - Exposes public API suitable for calling from audio thread and reading from GUI thread
-
-class LevelMeter
-{
-public:
-    LevelMeter() = default;
-    ~LevelMeter() = default;
-
-    // Call once before processing (audio thread) with sample rate and channels.
-    void prepare(double sampleRate, int numChannels = 2);
-
-    // Reset internal state (call on start/stop/seek etc.)
-    void reset();
-
-    // Process a buffer of interleaved or deinterleaved audio. For convenience, we accept
-    // a juce::AudioBuffer<float>& and will assume up to 'numChannels' channels are present.
-    void processBuffer(const juce::AudioBuffer<float>& buffer, int startSample = 0, int numSamples = -1);
-
-    // Return the current integrated LUFS value. This is atomic-safe for GUI thread usage.
-    // If no gated energy has been accumulated yet, returns NaN.
-    float getIntegratedLufs() const noexcept;
-
-    // Return whether integrated value is valid (i.e. we've accumulated gated audio)
-    bool hasIntegratedLufs() const noexcept;
-
-private:
-    void finalizeBlock(); // called when 400 ms block completes
-
-    // K-weighting filters (per-channel)
-    std::vector<juce::IIRFilter> hpFilters;    // high-pass
-    std::vector<juce::IIRFilter> shelfFilters; // high-shelf
-
-    double sampleRate = 48000.0;
-    int numChannels = 2;
-
-    // Block accumulation (400 ms)
-    const double blockDurationSeconds = 0.400; // 400 ms
-    int blockSize = 0;            // computed from sampleRate
-    int blockCounter = 0;
-    double blockEnergy = 0.0;    // sum of per-sample channel-weighted power
-
-    // Gated integrated accumulation
-    double accumulatedEnergy = 0.0;
-    double accumulatedTime = 0.0;
-
-    // Last computed integrated LUFS (atomic-safe for reads)
-    std::atomic<float> integratedLufs{ std::numeric_limits<float>::quiet_NaN() };
-    std::atomic<bool> integratedValid{ false };
-
-    // Constants
-    const double absoluteGate = -70.0; // LUFS
-    // Note: relative gate computed per-block as ungatedBlockLoudness - 10 LU
-
-    // Small epsilon to avoid log of zero
-    static constexpr double EPS = 1e-12;
-};
-
-
-// LevelMeter.cpp
 
 #include "LevelMeter.h"
 
 // Helper: convert power to LUFS according to ITU formula
 static double powerToLufs(double power)
 {
-    return -0.691 + 10.0 * std::log10(power + epsValue());
+    return -0.691 + 10.0 * std::log10(power + 1e-12);
 }
 
 void LevelMeter::prepare(double sr, int channels)
@@ -95,23 +26,20 @@ void LevelMeter::prepare(double sr, int channels)
     blockSize = static_cast<int>(std::round(blockDurationSeconds * sampleRate));
     if (blockSize < 1) blockSize = 1;
 
-    hpFilters.assign(numChannels, juce::IIRFilter());
-    shelfFilters.assign(numChannels, juce::IIRFilter());
+    // Resize vectors and create filters
+    hpFilters.resize(numChannels);
+    shelfFilters.resize(numChannels);
 
-    // --- K-weighting approximation ---
-    // Use a 2nd-order high-pass at 40 Hz (approximation) + a high-shelf around 4 kHz.
-    // These are widely used approximations of the ITU/EBU K-weighting chain and
-    // are suitable for most meter implementations. If you need bit-exact compliance
-    // with BS.1770, replace these with fixed coefficients derived from the spec.
-
+    // Set K-weighting filter coefficients per channel
     for (int ch = 0; ch < numChannels; ++ch)
     {
-        // High-pass: 40 Hz, Q ~= 0.707 (but ITU uses a specific prototype — this is a practical approximation)
-        hpFilters[ch].setCoefficients(juce::IIRCoefficients::makeHighPass(sampleRate, 40.0, 0.70710678));
+        hpFilters[ch].setCoefficients(
+            juce::IIRCoefficients::makeHighPass(sampleRate, 40.0, 0.70710678));
 
-        // High-shelf: +4 dB at 4000 Hz, Q ~= 0.707 (approximation)
         const double gainDb = 4.0;
-        shelfFilters[ch].setCoefficients(juce::IIRCoefficients::makeHighShelf(sampleRate, 4000.0, 0.70710678, juce::Decibels::decibelsToGain(gainDb)));
+        shelfFilters[ch].setCoefficients(
+            juce::IIRCoefficients::makeHighShelf(
+                sampleRate, 4000.0, 0.70710678, juce::Decibels::decibelsToGain(gainDb)));
     }
 
     reset();
@@ -258,10 +186,18 @@ bool LevelMeter::hasIntegratedLufs() const noexcept
     return integratedValid.load();
 }
 
-double epsValue()
-{
-    return 1e-12;
+
+double LevelMeter::epsValue() {
+    return EPS;
 }
+
+
+
+
+
+
+
+
 
 
 //Integration notes and usage example
