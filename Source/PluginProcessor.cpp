@@ -1,4 +1,4 @@
-/*
+﻿/*
   ==============================================================================
 
     This file contains the basic framework code for a JUCE plugin processor.
@@ -29,10 +29,7 @@ YetAnotherAudioAnalyzerAudioProcessor::~YetAnotherAudioAnalyzerAudioProcessor()
 }
 
 //==============================================================================
-const juce::String YetAnotherAudioAnalyzerAudioProcessor::getName() const
-{
-    return JucePlugin_Name;
-}
+const juce::String YetAnotherAudioAnalyzerAudioProcessor::getName() const { return JucePlugin_Name; }
 
 bool YetAnotherAudioAnalyzerAudioProcessor::acceptsMidi() const
 {
@@ -93,17 +90,18 @@ void YetAnotherAudioAnalyzerAudioProcessor::changeProgramName (int index, const 
 //==============================================================================
 void YetAnotherAudioAnalyzerAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    // Use this method as the place to do any pre-playback
-    // initialisation that you need..
-    spectrumAnalyzerL.prepareToPlay(sampleRate);
-    spectrumAnalyzerR.prepareToPlay(sampleRate);
+    spectrumAnalyzerL.prepareToPlay(sampleRate, samplesPerBlock);
+    spectrumAnalyzerR.prepareToPlay(sampleRate, samplesPerBlock);
+
     correlationMeter.prepareToPlay(1024);
+    levelMeter.prepare(sampleRate, samplesPerBlock);
+    stereoWidthMeter.prepare(sampleRate, samplesPerBlock);
+
 }
 
 void YetAnotherAudioAnalyzerAudioProcessor::releaseResources()
 {
-    // When playback stops, you can use this as an opportunity to free up any
-    // spare memory, etc.
+    // Nothing to release for analyzers
 }
 
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -135,26 +133,21 @@ bool YetAnotherAudioAnalyzerAudioProcessor::isBusesLayoutSupported (const BusesL
 void YetAnotherAudioAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
 
-    int numSamples = buffer.getNumSamples();
-    spectrumAnalyzerL.pushAudioBlock(buffer.getReadPointer(0), numSamples);
-    spectrumAnalyzerL.computeFFT();
+    juce::ScopedNoDenormals noDenormals;
 
-    if (getTotalNumInputChannels() > 1)
-    {
-        spectrumAnalyzerR.pushAudioBlock(buffer.getReadPointer(1), numSamples);
-        spectrumAnalyzerR.computeFFT();
-    }
+    const int numSamples = buffer.getNumSamples();
+    const float* left = buffer.getReadPointer(0);
+    const float* right = buffer.getReadPointer(1);
 
-    correlationMeter.pushAudioBlock(buffer.getReadPointer(0), buffer.getReadPointer(1), buffer.getNumSamples());
+    // ---- FEED DSP MODULES ----
+    spectrumAnalyzerL.pushAudioBlock(left, numSamples);
+    spectrumAnalyzerR.pushAudioBlock(right, numSamples);
 
-    // Optionally update GUI
-    if (editor != nullptr)
-    {
-        editor->updateSpectrum(spectrumAnalyzerL.getMagnitude(), spectrumAnalyzerR.getMagnitude());
-        editor->updateCorrelation(correlationMeter.getCorrelation());
+    correlationMeter.pushAudioBlock(left, right, numSamples);
+    levelMeter.processBuffer(buffer);
+    stereoWidthMeter.processBlock(buffer);
 
-
-    };
+    // Analyzer plugin → pass audio through untouched
 }
 
 //==============================================================================
@@ -171,15 +164,13 @@ juce::AudioProcessorEditor* YetAnotherAudioAnalyzerAudioProcessor::createEditor(
 //==============================================================================
 void YetAnotherAudioAnalyzerAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    // You should use this method to store your parameters in the memory block.
-    // You could do that either as raw data, or use the XML or ValueTree classes
-    // as intermediaries to make it easy to save and load complex data.
+    juce::ignoreUnused(destData);
+    // No parameters yet — implement later if needed
 }
 
 void YetAnotherAudioAnalyzerAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
-    // You should use this method to restore your parameters from this memory block,
-    // whose contents will have been created by the getStateInformation() call.
+    juce::ignoreUnused(data, sizeInBytes);
 }
 
 //==============================================================================

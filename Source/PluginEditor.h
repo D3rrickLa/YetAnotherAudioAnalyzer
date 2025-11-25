@@ -14,7 +14,7 @@
 //==============================================================================
 /**
 */
-class YetAnotherAudioAnalyzerAudioProcessorEditor  : public juce::AudioProcessorEditor
+class YetAnotherAudioAnalyzerAudioProcessorEditor  : public juce::AudioProcessorEditor, private juce::Timer
 {
 public:
     YetAnotherAudioAnalyzerAudioProcessorEditor (YetAnotherAudioAnalyzerAudioProcessor&);
@@ -25,9 +25,13 @@ public:
     void resized() override;
 
 private:
-    // This reference is provided as a quick way for your editor to
-    // access the processor object that created it.
+    void timerCallback();
     YetAnotherAudioAnalyzerAudioProcessor& audioProcessor;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (YetAnotherAudioAnalyzerAudioProcessorEditor)
+    // Basic values from meters
+    float correlationValue = 1.0f;
+    float widthValue = 0.0f;
+    float levelValue = 0.0f;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(YetAnotherAudioAnalyzerAudioProcessorEditor)
 };

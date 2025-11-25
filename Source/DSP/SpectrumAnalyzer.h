@@ -13,7 +13,7 @@ public:
     SpectrumAnalyzer(int fftOrder = 11); // 2^11 = 2048 points
     ~SpectrumAnalyzer() = default;
 
-    void prepareToPlay(double sampleRate);
+    void prepareToPlay(double sampleRate, int samplePerBlock);
     void SpectrumAnalyzer::pushAudioBlock(const float* input, int numSamples);
     void computeFFT();
     const juce::HeapBlock<float>& getMagnitude() const { return magnitude; }

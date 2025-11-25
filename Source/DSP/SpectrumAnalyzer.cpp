@@ -5,7 +5,7 @@ SpectrumAnalyzer::SpectrumAnalyzer(int fftOrder) : fftOrder(fftOrder), fftSize(1
 	fftData.calloc(2 * fftSize); // FFT needs 2x space for RT+imag
 }
 
-void SpectrumAnalyzer::prepareToPlay(double sampleRate)
+void SpectrumAnalyzer::prepareToPlay(double sampleRate, int samplePerBlock)
 {
     juce::ignoreUnused(sampleRate);
     fifoIndex = 0;

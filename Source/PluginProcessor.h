@@ -11,6 +11,8 @@
 #include <JuceHeader.h>
 #include "DSP/SpectrumAnalyzer.h"
 #include "DSP/CorrelationMeter.h"
+#include "DSP/LevelMeter.h"
+#include "DSP/StereoWidthVisualizer.h"
 
 //==============================================================================
 /**
@@ -54,8 +56,13 @@ public:
     //==============================================================================
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
-
-    PluginEditor* editor = nullptr;
+    
+    // ====== DSP Getters for Editor ======
+    SpectrumAnalyzer& getSpectrumAnalyzerL() { return spectrumAnalyzerL; }
+    SpectrumAnalyzer& getSpectrumAnalyzerR() { return spectrumAnalyzerR; }
+    CorrelationMeter& getCorrelationMeter() { return correlationMeter; }
+    LevelMeter& getLevelMeter() { return levelMeter; }
+    StereoWidthVisualizer& getStereoWidthMeter() { return stereoWidthMeter; }
 private:
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(YetAnotherAudioAnalyzerAudioProcessor);
@@ -63,6 +70,7 @@ private:
     SpectrumAnalyzer spectrumAnalyzerL;
     SpectrumAnalyzer spectrumAnalyzerR;
     CorrelationMeter correlationMeter;
-
+    LevelMeter levelMeter;
+    StereoWidthVisualizer stereoWidthMeter;
 
 };
