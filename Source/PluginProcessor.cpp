@@ -144,7 +144,7 @@ void YetAnotherAudioAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<floa
     spectrumAnalyzerR.pushAudioBlock(right, numSamples);
 
     correlationMeter.pushAudioBlock(left, right, numSamples);
-    levelMeter.processBuffer(buffer);
+    levelMeter.processBuffer(buffer, 0, numSamples);
     stereoWidthMeter.processBlock(buffer);
 
     // Analyzer plugin → pass audio through untouched

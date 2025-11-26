@@ -27,10 +27,29 @@ YetAnotherAudioAnalyzerAudioProcessorEditor::~YetAnotherAudioAnalyzerAudioProces
 
 void YetAnotherAudioAnalyzerAudioProcessorEditor::timerCallback()
 {
-    // --- Pull data from DSP modules ---
-    audioProcessor.getCorrelationMeter().getCorrelation();
+    // Ask the processor analyzers to compute their current FFT (thread-safe)
+    audioProcessor.getSpectrumAnalyzerL().computeFFT();
+    audioProcessor.getSpectrumAnalyzerR().computeFFT();
+
+    // Copy magnitudes out to editor-local vectors (to avoid locking during paint)
+    {
+        const juce::ScopedLock sl(audioProcessor.getSpectrumAnalyzerL().getLock()); // if you expose a lock getter
+        leftMagnitudes = audioProcessor.getSpectrumAnalyzerL().getMagnitudesCopy(); // copy
+    }
+    {
+        const juce::ScopedLock sl(audioProcessor.getSpectrumAnalyzerR().getLock());
+        rightMagnitudes = audioProcessor.getSpectrumAnalyzerR().getMagnitudesCopy();
+    }
+
+    // Level meter: use integrated if available, otherwise draw 0 or fall back to peak/RMS.
+    if (audioProcessor.getLevelMeter().hasIntegratedLufs())
+        levelValue = audioProcessor.getLevelMeter().getIntegratedLufs();
+    else
+        levelValue = 0.0f;
+
+    // get correlation / width as before
+    correlationValue = audioProcessor.getCorrelationMeter().getCorrelation();
     audioProcessor.getStereoWidthMeter().getResults(correlationValue, widthValue);
-    levelValue = audioProcessor.getLevelMeter().getIntegratedLufs();
 
     repaint();
 }

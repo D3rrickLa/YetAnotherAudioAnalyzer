@@ -18,6 +18,13 @@ public:
     void computeFFT();
     const std::vector<float>& getMagnitude() const { return magnitude; }
 
+    std::vector<float> getMagnitudesCopy() const {
+        const juce::ScopedLock sl(lock);
+        return magnitude;
+    }
+
+    juce::CriticalSection& getLock();
+
 private:
     int fftOrder;
     int fftSize;
@@ -25,5 +32,8 @@ private:
     std::vector<float> fftData;
     std::vector<float> magnitude;
     int fifoIndex = 0;
+    bool fifoFilled = false;
     juce::CriticalSection lock;
+
+    juce::dsp::WindowingFunction<float> window{ (size_t)fftSize, juce::dsp::WindowingFunction<float>::hann };
 };
