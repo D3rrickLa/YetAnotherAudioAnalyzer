@@ -1,67 +1,96 @@
 #include "SpectrumAnalyzer.h"
 
-SpectrumAnalyzer::SpectrumAnalyzer(int fftOrder)     : fftOrder(fftOrder),
-      fftSize(1 << fftOrder),
-      fft(fftOrder)
+SpectrumAnalyzer::SpectrumAnalyzer(int order)
+    : fftOrder(order),
+    fftSize(1 << order),
+    fft(std::make_unique<juce::dsp::FFT>(order)),
+    window((size_t)(1 << order), juce::dsp::WindowingFunction<float>::hann),
+    fifo((size_t)(1 << order), 0.0f),
+    fftData((size_t)2 * (1 << order), 0.0f),
+    magnitude((size_t)((1 << order) / 2), 0.0f)
 {
-    fftData.resize(2 * fftSize, 0.0f);  // FFT needs 2x space for RT+imag
+    fifoIndex = 0;
+    fifoWrapped = false;
 }
 
-void SpectrumAnalyzer::prepareToPlay(double sampleRate, int samplePerBlock)
+void SpectrumAnalyzer::prepareToPlay(double /*sampleRate*/, int /*samplesPerBlockExpected*/)
 {
-    juce::ignoreUnused(sampleRate);
+    const juce::ScopedLock sl(lock);
+    std::fill(fifo.begin(), fifo.end(), 0.0f);
+    std::fill(fftData.begin(), fftData.end(), 0.0f);
+    std::fill(magnitude.begin(), magnitude.end(), 0.0f);
     fifoIndex = 0;
-    fftData.resize(2 * fftSize, 0.0f);          // allocate and zero
-    magnitude.resize(fftSize / 2, 0.0f);        // allocate and zero
+    fifoWrapped = false;
 }
 
 void SpectrumAnalyzer::pushAudioBlock(const float* input, int numSamples)
 {
+    // Called on audio thread. We append samples to fifo; when it wraps once
+    // we mark fifoWrapped true so computeFFT() can produce frames.
+    if (input == nullptr || numSamples <= 0)
+        return;
+
     const juce::ScopedLock sl(lock);
     for (int i = 0; i < numSamples; ++i)
     {
-        fftData[fifoIndex++] = input[i];
-        if (fifoIndex >= fftSize) {
-            fifoIndex = 0; // simple wrap-around FIFO
-            fifoFilled = true;
+        fifo[fifoIndex++] = input[i];
+        if (fifoIndex >= fftSize)
+        {
+            fifoIndex = 0;
+            fifoWrapped = true;
         }
     }
 }
 
 void SpectrumAnalyzer::computeFFT()
 {
-    // Make sure we have a full frame (avoid computing on partially filled buffer).
+    // Call from timer thread. Early-return if we don't have a full frame yet.
     const juce::ScopedLock sl(lock);
-    if (!fifoFilled)
-        return; // not enough samples yet
+    if (!fifoWrapped)
+        return;
 
-    // assemble a contiguous frame of the most recent fftSize samples into temp
-    std::vector<float> temp(2 * fftSize, 0.0f); // real+imag storage expected by JUCE
+    // Copy most recent fftSize samples into fftData[0..fftSize-1] in chronological order:
+    // oldest sample is at fifoIndex, newest just before fifoIndex.
     for (int i = 0; i < fftSize; ++i)
-        temp[i] = fftData[(fifoIndex + i) % fftSize];
-
-    // apply window
-    juce::dsp::WindowingFunction<float> win((size_t)fftSize, juce::dsp::WindowingFunction<float>::hann);
-    win.multiplyWithWindowingTable(temp.data(), fftSize);
-
-    // perform real FFT in-place (JUCE expects an array of size 2*fftSize)
-    fft.performRealOnlyForwardTransform(temp.data());
-
-    // compute magnitudes (only up to fftSize/2)
-    const int numBins = fftSize / 2;
-    magnitude.assign(numBins, 0.0f);
-
-    // In JUCE real-FFT output: pairs [re0, reN/2, re1, im1, re2, im2, ...] can be complicated;
-    // the common approach below matches the layout used by many examples (real/imag interleaved).
-    for (int bin = 0; bin < numBins; ++bin)
     {
-        const float re = temp[2 * bin];
-        const float im = temp[2 * bin + 1];
+        int src = (fifoIndex + i) % fftSize;
+        fftData[i] = fifo[src];
+    }
+
+    // Zero imaginary portion (required by JUCE real FFT layout)
+    std::fill(fftData.begin() + fftSize, fftData.end(), 0.0f);
+
+    // window the real samples in-place
+    window.multiplyWithWindowingTable(fftData.data(), fftSize);
+
+    // perform in-place real FFT (data length must be 2*fftSize)
+    fft->performRealOnlyForwardTransform(fftData.data());
+
+    // compute magnitudes. JUCE real-FFT layout:
+    // fftData[0] = real(0) (DC)
+    // fftData[1] = real(N/2) (Nyquist) (for even N)
+    // for k=1..N/2-1: re = fftData[2*k], im = fftData[2*k+1]
+    const int numBins = fftSize / 2;
+    if ((int)magnitude.size() != numBins)
+        magnitude.resize(numBins);
+
+    // bin 0 (DC)
+    magnitude[0] = std::abs(fftData[0]);
+
+    // bins 1..numBins-1
+    for (int bin = 1; bin < numBins; ++bin)
+    {
+        const float re = fftData[2 * bin];
+        const float im = fftData[2 * bin + 1];
         magnitude[bin] = std::sqrt(re * re + im * im);
     }
+
+    // Note: we keep fifoWrapped true so we continuously produce frames (sliding window).
+    // If you want non-overlapping frames, change pushAudioBlock to copy+compute and reset fifoWrapped.
 }
 
-juce::CriticalSection& SpectrumAnalyzer::getLock()
+std::vector<float> SpectrumAnalyzer::getMagnitudesCopy() const
 {
-    return lock;
+    const juce::ScopedLock sl(lock);
+    return magnitude; // copy under lock
 }

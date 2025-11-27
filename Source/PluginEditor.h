@@ -29,12 +29,10 @@ private:
     YetAnotherAudioAnalyzerAudioProcessor& audioProcessor;
 
     // Basic values from meters
+    std::vector<float> leftMagnitudes, rightMagnitudes;
+    float levelValue = 0.0f;
     float correlationValue = 1.0f;
     float widthValue = 0.0f;
-    float levelValue = 0.0f;
-
-    std::vector<float> leftMagnitudes;
-    std::vector<float> rightMagnitudes;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(YetAnotherAudioAnalyzerAudioProcessorEditor)
 };

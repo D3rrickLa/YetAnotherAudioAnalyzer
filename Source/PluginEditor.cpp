@@ -27,27 +27,21 @@ YetAnotherAudioAnalyzerAudioProcessorEditor::~YetAnotherAudioAnalyzerAudioProces
 
 void YetAnotherAudioAnalyzerAudioProcessorEditor::timerCallback()
 {
-    // Ask the processor analyzers to compute their current FFT (thread-safe)
+    // trigger FFT compute on the processors (computeFFT is safe and copy-under-lock)
     audioProcessor.getSpectrumAnalyzerL().computeFFT();
     audioProcessor.getSpectrumAnalyzerR().computeFFT();
 
-    // Copy magnitudes out to editor-local vectors (to avoid locking during paint)
-    {
-        const juce::ScopedLock sl(audioProcessor.getSpectrumAnalyzerL().getLock()); // if you expose a lock getter
-        leftMagnitudes = audioProcessor.getSpectrumAnalyzerL().getMagnitudesCopy(); // copy
-    }
-    {
-        const juce::ScopedLock sl(audioProcessor.getSpectrumAnalyzerR().getLock());
-        rightMagnitudes = audioProcessor.getSpectrumAnalyzerR().getMagnitudesCopy();
-    }
+    // get copies for GUI
+    leftMagnitudes = audioProcessor.getSpectrumAnalyzerL().getMagnitudesCopy();
+    rightMagnitudes = audioProcessor.getSpectrumAnalyzerR().getMagnitudesCopy();
 
-    // Level meter: use integrated if available, otherwise draw 0 or fall back to peak/RMS.
+    // level: prefer integrated, otherwise last-block
     if (audioProcessor.getLevelMeter().hasIntegratedLufs())
         levelValue = audioProcessor.getLevelMeter().getIntegratedLufs();
     else
-        levelValue = 0.0f;
+        levelValue = audioProcessor.getLevelMeter().getLastBlockLufs();
 
-    // get correlation / width as before
+    // correlation/width (use your existing accessors)
     correlationValue = audioProcessor.getCorrelationMeter().getCorrelation();
     audioProcessor.getStereoWidthMeter().getResults(correlationValue, widthValue);
 
@@ -59,76 +53,41 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::paint(juce::Graphics& g)
 {
     g.fillAll(juce::Colours::black);
 
-    auto bounds = getLocalBounds();
-
-    // Split layout into 3 rows
-    auto topRow = bounds.removeFromTop(bounds.getHeight() * 0.45f);
-    auto midRow = bounds.removeFromTop(bounds.getHeight() * 0.25f);
-    auto bottomRow = bounds;
-
-    // ===== TOP: FAKE SPECTRUM RECTANGLES (placeholders) =====
-    auto leftSpectrum = topRow.removeFromLeft(topRow.getWidth() / 2);
-    auto rightSpectrum = topRow;
-
-    g.setColour(juce::Colours::darkgrey);
-    g.fillRect(leftSpectrum.reduced(4));
-    g.fillRect(rightSpectrum.reduced(4));
-
+    // draw LUFS text
     g.setColour(juce::Colours::white);
-    g.drawText("Left Spectrum", leftSpectrum, juce::Justification::centred);
-    g.drawText("Right Spectrum", rightSpectrum, juce::Justification::centred);
+    g.setFont(14.0f);
+    g.drawText("LUFS: " + juce::String(levelValue, 2), 10, 10, 200, 20, juce::Justification::left);
 
+    // draw a simple spectrum (leftMagnitudes)
+    const auto& mags = leftMagnitudes;
+    if (mags.empty())
+        return;
 
-    // ===== MIDDLE: CORRELATION METER =====
-    float correlationNormalized = juce::jmap(correlationValue, -1.0f, 1.0f, 0.0f, 1.0f);
+    const int w = getWidth();
+    const int h = getHeight();
+    const int numBins = (int)mags.size();
+    const float binW = (float)w / (float)numBins;
 
-    auto corrRect = midRow.reduced(10);
-    g.setColour(juce::Colours::grey);
-    g.fillRect(corrRect);
+    for (int i = 0; i < numBins; ++i)
+    {
+        const float mag = mags[(size_t)i];
+        const float db = juce::Decibels::gainToDecibels(mag + 1e-12f);
+        const float dbClamped = juce::jlimit(-100.0f, 0.0f, db);
+        const float y = juce::jmap(dbClamped, -100.0f, 0.0f, (float)h, 40.0f); // leave top margin
+        const float x = i * binW;
+        g.setColour(juce::Colours::lightblue.withAlpha(0.9f));
+        g.fillRect(x, y, juce::jmax(1.0f, binW - 1.0f), (float)h - y);
+    }
 
-    auto corrFill = corrRect.withWidth((float)corrRect.getWidth() * correlationNormalized);
-    g.setColour(correlationValue < 0 ? juce::Colours::red : juce::Colours::green);
-    g.fillRect(corrFill);
-
-    g.setColour(juce::Colours::white);
+    // draw correlation and width
+    g.setColour(juce::Colours::yellow);
+    g.setFont(14.0f);
     g.drawText("Correlation: " + juce::String(correlationValue, 2),
-        corrRect, juce::Justification::centred);
+        10, 30, 200, 20, juce::Justification::left);
 
-
-    // ===== BOTTOM: LEVEL METER + WIDTH =====
-    auto leftBottom = bottomRow.removeFromLeft(bottomRow.getWidth() * 0.5f);
-    auto rightBottom = bottomRow;
-
-    // Level meter vertical bar
-    float levelHeight = juce::jlimit(0.0f, 1.0f, levelValue);
-    auto levelRect = leftBottom.reduced(10);
-    auto levelBar = levelRect.removeFromBottom(levelRect.getHeight() * levelHeight);
-
-    g.setColour(juce::Colours::darkgrey);
-    g.fillRect(levelRect);
-
-    g.setColour(juce::Colours::skyblue);
-    g.fillRect(levelBar);
-
-    g.setColour(juce::Colours::white);
-    g.drawText("Level", leftBottom, juce::Justification::centredTop);
-
-
-    // Width meter bar (horizontal)
-    auto widthRect = rightBottom.reduced(10);
-    float widthNorm = juce::jlimit(0.0f, 2.0f, widthValue) / 2.0f;
-
-    auto widthFill = widthRect.withWidth(widthRect.getWidth() * widthNorm);
-
-    g.setColour(juce::Colours::darkgrey);
-    g.fillRect(widthRect);
-
-    g.setColour(juce::Colours::orange);
-    g.fillRect(widthFill);
-
-    g.setColour(juce::Colours::white);
     g.drawText("Width: " + juce::String(widthValue, 2),
-        widthRect, juce::Justification::centred);
+        10, 50, 200, 20, juce::Justification::left);
+
 }
 
 void YetAnotherAudioAnalyzerAudioProcessorEditor::resized()

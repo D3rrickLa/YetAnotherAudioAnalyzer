@@ -92,9 +92,9 @@ void YetAnotherAudioAnalyzerAudioProcessor::prepareToPlay (double sampleRate, in
 {
     spectrumAnalyzerL.prepareToPlay(sampleRate, samplesPerBlock);
     spectrumAnalyzerR.prepareToPlay(sampleRate, samplesPerBlock);
-
+    levelMeter.prepare(sampleRate, getTotalNumInputChannels());
+    
     correlationMeter.prepareToPlay(1024);
-    levelMeter.prepare(sampleRate, samplesPerBlock);
     stereoWidthMeter.prepare(sampleRate, samplesPerBlock);
 
 }
@@ -132,22 +132,25 @@ bool YetAnotherAudioAnalyzerAudioProcessor::isBusesLayoutSupported (const BusesL
 
 void YetAnotherAudioAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
-
     juce::ScopedNoDenormals noDenormals;
 
     const int numSamples = buffer.getNumSamples();
-    const float* left = buffer.getReadPointer(0);
-    const float* right = buffer.getReadPointer(1);
 
-    // ---- FEED DSP MODULES ----
-    spectrumAnalyzerL.pushAudioBlock(left, numSamples);
-    spectrumAnalyzerR.pushAudioBlock(right, numSamples);
+    // Guard channels
+    const float* left = (buffer.getNumChannels() > 0) ? buffer.getReadPointer(0) : nullptr;
+    const float* right = (buffer.getNumChannels() > 1) ? buffer.getReadPointer(1) : nullptr;
 
+    if (left != nullptr)
+        spectrumAnalyzerL.pushAudioBlock(left, numSamples);
+    if (right != nullptr)
+        spectrumAnalyzerR.pushAudioBlock(right, numSamples);
+
+    // correlation/stereo width (you already have working code)
     correlationMeter.pushAudioBlock(left, right, numSamples);
+
+    // Level meter: pass the entire buffer range explicitly
     levelMeter.processBuffer(buffer, 0, numSamples);
     stereoWidthMeter.processBlock(buffer);
-
-    // Analyzer plugin → pass audio through untouched
 }
 
 //==============================================================================
