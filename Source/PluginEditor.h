@@ -14,6 +14,9 @@
 //==============================================================================
 /**
 */
+
+enum class ViewMode { Spectrum, MultibandCorrelation, AdvanceLufs };
+
 class YetAnotherAudioAnalyzerAudioProcessorEditor  : public juce::AudioProcessorEditor, private juce::Timer
 {
 public:
@@ -23,6 +26,8 @@ public:
     //==============================================================================
     void paint (juce::Graphics&) override;
     void resized() override;
+    void paintSpectrumScreen(juce::Graphics&);
+    void paintMultibandScreen(juce::Graphics&);
 
 private:
     void timerCallback();
@@ -33,6 +38,10 @@ private:
     float levelValue = 0.0f;
     float correlationValue = 1.0f;
     float widthValue = 0.0f;
+    ViewMode currentView = ViewMode::Spectrum;
+    juce::TextButton viewSwitchButton{ "Switch View" };
+
+
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(YetAnotherAudioAnalyzerAudioProcessorEditor)
 };

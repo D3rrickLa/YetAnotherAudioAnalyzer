@@ -17,6 +17,22 @@ YetAnotherAudioAnalyzerAudioProcessorEditor::YetAnotherAudioAnalyzerAudioProcess
     // editor's size to whatever you need it to be.
     setSize(800, 400);
 
+
+    addAndMakeVisible(viewSwitchButton);
+    viewSwitchButton.setButtonText("Switch View");
+
+
+    viewSwitchButton.onClick = [this]()
+        {
+            if (currentView == ViewMode::Spectrum)
+                currentView = ViewMode::MultibandCorrelation;
+            else
+                currentView = ViewMode::Spectrum;
+
+            repaint();
+        };
+
+
     // Update GUI 30 times per second
     startTimerHz(30);
 }
@@ -51,8 +67,37 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::timerCallback()
 //==============================================================================
 void YetAnotherAudioAnalyzerAudioProcessorEditor::paint(juce::Graphics& g)
 {
-    g.fillAll(juce::Colours::black);
+    g.fillAll(juce::Colours::grey);
 
+    if (currentView == ViewMode::Spectrum)
+    {
+        paintSpectrumScreen(g);
+    }
+    else
+    {
+        paintMultibandScreen(g);
+    }
+
+    /*
+        Features/design choice I want
+        3 screens - a button to swtich between spectrum to multiband correlation. another one is a LUFS meter with more info like peak, target, reference, etc.
+
+        screen 1
+            spectrum
+            LUFS
+            width
+            basic correlation
+
+        screen 2
+            multiband correlation
+            LUFs (more advance)
+
+    */
+
+}
+
+void YetAnotherAudioAnalyzerAudioProcessorEditor::paintSpectrumScreen(juce::Graphics& g)
+{
     // draw LUFS text
     g.setColour(juce::Colours::white);
     g.setFont(14.0f);
@@ -80,7 +125,7 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::paint(juce::Graphics& g)
     }
 
     // draw correlation and width
-    g.setColour(juce::Colours::yellow);
+    g.setColour(juce::Colours::aqua);
     g.setFont(14.0f);
     g.drawText("Correlation: " + juce::String(correlationValue, 2),
         10, 30, 200, 20, juce::Justification::left);
@@ -90,7 +135,14 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::paint(juce::Graphics& g)
 
 }
 
+void YetAnotherAudioAnalyzerAudioProcessorEditor::paintMultibandScreen(juce::Graphics& g)
+{
+    g.setColour(juce::Colours::white);
+    g.drawText("Multiband correlation screen (WIP)", 20, 20, 400, 30, juce::Justification::left);
+}
+
 void YetAnotherAudioAnalyzerAudioProcessorEditor::resized()
 {
     // No child components yet
+    viewSwitchButton.setBounds(10, 10, 120, 30);
 }
