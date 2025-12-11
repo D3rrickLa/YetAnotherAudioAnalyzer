@@ -27,6 +27,7 @@ public:
     void paint (juce::Graphics&) override;
     void resized() override;
     void paintSpectrumScreen(juce::Graphics&, int headerHeight);
+    void drawFrequencyOverlay(juce::Graphics& g, int headerHeight);
     void paintMultibandScreen(juce::Graphics&, int headerHeight);
 
 private:

@@ -13,11 +13,11 @@ public:
     ~SpectrumAnalyzer() = default;
 
     void prepareToPlay(double sampleRate, int samplesPerBlockExpected);
-    void pushAudioBlock(const float* input, int numSamples); // called on audio thread
-    void computeFFT(); // safe to call from timer thread (will early-return if not ready)
+    void pushAudioBlock(const float* input, int numSamples);   // called on audio thread
+    void computeFFT();                                         // internal
+    void updateSmoothedMagnitudes();                           // called on GUI timer
 
-    // thread-safe copy of magnitudes for GUI
-    std::vector<float> getMagnitudesCopy() const;
+    std::vector<float> getMagnitudesCopy() const;             // thread-safe copy for GUI
 
     int getFftSize() const noexcept { return fftSize; }
 
@@ -26,22 +26,18 @@ private:
 
     const int fftOrder;
     const int fftSize;
-    const int hopSize; // number of samples between FFT computations
+    const int hopSize;
+    int fifoIndex = 0;
     int samplesSinceLastFFT = 0;
+    bool fifoWrapped = false;
 
     std::unique_ptr<juce::dsp::FFT> fft;
     juce::dsp::WindowingFunction<float> window;
 
-    // circular FIFO holding the most recent fftSize samples
     std::vector<float> fifo;
-    int fifoIndex = 0;
-    bool fifoWrapped = false;
-
-    // working buffer used for FFT (size 2*fftSize for JUCE real FFT)
     std::vector<float> fftData;
-
-    // magnitude output (fftSize/2 bins)
     std::vector<float> magnitude;
     std::vector<float> smoothedMagnitude;
-    float smoothingFactor = 0.3f; // tweak 0.1-0.5 for smoother display
+
+    float smoothingFactor = 0.5f; // tweak 0.3-0.7 for smoothness
 };
