@@ -11,6 +11,7 @@ SpectrumAnalyzer::SpectrumAnalyzer(int order)
 {
     fifoIndex = 0;
     fifoWrapped = false;
+    smoothedMagnitude.resize(magnitude.size(), 0.0f);
 }
 
 void SpectrumAnalyzer::prepareToPlay(double /*sampleRate*/, int /*samplesPerBlockExpected*/)
@@ -83,6 +84,8 @@ void SpectrumAnalyzer::computeFFT()
         const float re = fftData[2 * bin];
         const float im = fftData[2 * bin + 1];
         magnitude[bin] = std::sqrt(re * re + im * im);
+        smoothedMagnitude[bin] = smoothingFactor * magnitude[bin]
+            + (1.0f - smoothingFactor) * smoothedMagnitude[bin];
     }
 
     // Note: we keep fifoWrapped true so we continuously produce frames (sliding window).
@@ -92,5 +95,5 @@ void SpectrumAnalyzer::computeFFT()
 std::vector<float> SpectrumAnalyzer::getMagnitudesCopy() const
 {
     const juce::ScopedLock sl(lock);
-    return magnitude; // copy under lock
+    return smoothedMagnitude; // copy under lock, returns the smoothed out version, not raw
 }

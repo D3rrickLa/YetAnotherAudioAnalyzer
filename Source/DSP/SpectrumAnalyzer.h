@@ -30,6 +30,10 @@ private:
     std::unique_ptr<juce::dsp::FFT> fft;
     juce::dsp::WindowingFunction<float> window;
 
+    // for smoothing the spectrum
+    std::vector<float> smoothedMagnitude;
+    float smoothingFactor = 0.3f; //tweak for smoothness, 0.1-0.5
+
     // circular FIFO holding the most recent fftSize samples
     std::vector<float> fifo;
     int fifoIndex = 0;

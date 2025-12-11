@@ -33,8 +33,8 @@ YetAnotherAudioAnalyzerAudioProcessorEditor::YetAnotherAudioAnalyzerAudioProcess
         };
 
 
-    // Update GUI 30 times per second
-    startTimerHz(30);
+    // Update GUI 60 times per second
+    startTimerHz(60);
 }
 
 YetAnotherAudioAnalyzerAudioProcessorEditor::~YetAnotherAudioAnalyzerAudioProcessorEditor()
