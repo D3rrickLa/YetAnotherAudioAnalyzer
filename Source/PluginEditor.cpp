@@ -69,47 +69,43 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::paint(juce::Graphics& g)
 {
     g.fillAll(juce::Colours::grey);
 
+    const int headerHeight = 50;
+
+    // Draw top header background
+    g.setColour(juce::Colours::darkgrey.darker(0.2f));
+    g.fillRect(0, 0, getWidth(), headerHeight);
+
+    // Draw static UI labels in the header area
+    g.setColour(juce::Colours::white);
+    g.setFont(14.0f);
+
+    g.drawText("LUFS: " + juce::String(levelValue, 2),
+        170, 10, 100, 30, juce::Justification::left);
+
+    g.drawText("Corr: " + juce::String(correlationValue, 2),
+        280, 10, 100, 30, juce::Justification::left);
+
+    g.drawText("Width: " + juce::String(widthValue, 2),
+        390, 10, 100, 30, juce::Justification::left);
+
+    // Paint the currently active screen *below* the header
     if (currentView == ViewMode::Spectrum)
-    {
-        paintSpectrumScreen(g);
-    }
+        paintSpectrumScreen(g, headerHeight);
     else
-    {
-        paintMultibandScreen(g);
-    }
-
-    /*
-        Features/design choice I want
-        3 screens - a button to swtich between spectrum to multiband correlation. another one is a LUFS meter with more info like peak, target, reference, etc.
-
-        screen 1
-            spectrum
-            LUFS
-            width
-            basic correlation
-
-        screen 2
-            multiband correlation
-            LUFs (more advance)
-
-    */
+        paintMultibandScreen(g, headerHeight);
 
 }
 
-void YetAnotherAudioAnalyzerAudioProcessorEditor::paintSpectrumScreen(juce::Graphics& g)
+void YetAnotherAudioAnalyzerAudioProcessorEditor::paintSpectrumScreen(juce::Graphics& g, int headerHeight)
 {
-    // draw LUFS text
-    g.setColour(juce::Colours::white);
-    g.setFont(14.0f);
-    g.drawText("LUFS: " + juce::String(levelValue, 2), 10, 10, 200, 20, juce::Justification::left);
-
-    // draw a simple spectrum (leftMagnitudes)
     const auto& mags = leftMagnitudes;
     if (mags.empty())
         return;
 
     const int w = getWidth();
     const int h = getHeight();
+    const int availableHeight = h - headerHeight;
+
     const int numBins = (int)mags.size();
     const float binW = (float)w / (float)numBins;
 
@@ -118,31 +114,32 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::paintSpectrumScreen(juce::Grap
         const float mag = mags[(size_t)i];
         const float db = juce::Decibels::gainToDecibels(mag + 1e-12f);
         const float dbClamped = juce::jlimit(-100.0f, 0.0f, db);
-        const float y = juce::jmap(dbClamped, -100.0f, 0.0f, (float)h, 40.0f); // leave top margin
-        const float x = i * binW;
+
+        // map into area *below header*
+        float y = juce::jmap(dbClamped,
+            -100.0f, 0.0f,
+            (float)(h), (float)(headerHeight + 10));
+
         g.setColour(juce::Colours::lightblue.withAlpha(0.9f));
-        g.fillRect(x, y, juce::jmax(1.0f, binW - 1.0f), (float)h - y);
+        g.fillRect(i * binW,
+            y,
+            juce::jmax(1.0f, binW - 1.0f),
+            (float)h - y);
     }
-
-    // draw correlation and width
-    g.setColour(juce::Colours::aqua);
-    g.setFont(14.0f);
-    g.drawText("Correlation: " + juce::String(correlationValue, 2),
-        10, 30, 200, 20, juce::Justification::left);
-
-    g.drawText("Width: " + juce::String(widthValue, 2),
-        10, 50, 200, 20, juce::Justification::left);
 
 }
 
-void YetAnotherAudioAnalyzerAudioProcessorEditor::paintMultibandScreen(juce::Graphics& g)
+void YetAnotherAudioAnalyzerAudioProcessorEditor::paintMultibandScreen(juce::Graphics& g, int headerHeight)
 {
     g.setColour(juce::Colours::white);
-    g.drawText("Multiband correlation screen (WIP)", 20, 20, 400, 30, juce::Justification::left);
+    g.drawText("Multiband correlation screen (WIP)",
+        20, headerHeight + 20, 400, 30,
+        juce::Justification::left);
 }
 
 void YetAnotherAudioAnalyzerAudioProcessorEditor::resized()
 {
-    // No child components yet
-    viewSwitchButton.setBounds(10, 10, 120, 30);
+    const int headerHeight = 50;
+
+    viewSwitchButton.setBounds(10, 10, 150, 30);
 }

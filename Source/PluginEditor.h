@@ -26,8 +26,8 @@ public:
     //==============================================================================
     void paint (juce::Graphics&) override;
     void resized() override;
-    void paintSpectrumScreen(juce::Graphics&);
-    void paintMultibandScreen(juce::Graphics&);
+    void paintSpectrumScreen(juce::Graphics&, int headerHeight);
+    void paintMultibandScreen(juce::Graphics&, int headerHeight);
 
 private:
     void timerCallback();

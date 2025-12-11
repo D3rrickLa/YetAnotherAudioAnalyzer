@@ -2,7 +2,8 @@
 
 <JUCERPROJECT id="RayJo7" name="YetAnotherAudioAnalyzer" projectType="audioplug"
               useAppConfig="0" addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1"
-              pluginFormats="buildStandalone,buildVST3" pluginVST3Category="Mastering,Tools">
+              pluginFormats="buildStandalone,buildVST3" pluginVST3Category="Mastering,Tools"
+              version="0.0.2">
   <MAINGROUP id="hmDvap" name="YetAnotherAudioAnalyzer">
     <GROUP id="{1A7B91DB-DB62-9BB9-557A-6D40F234BAA0}" name="DSP">
       <FILE id="J5qLSC" name="CorrelationMeter.cpp" compile="1" resource="0"
