@@ -26,13 +26,11 @@ private:
 
     const int fftOrder;
     const int fftSize;
+    const int hopSize; // number of samples between FFT computations
+    int samplesSinceLastFFT = 0;
 
     std::unique_ptr<juce::dsp::FFT> fft;
     juce::dsp::WindowingFunction<float> window;
-
-    // for smoothing the spectrum
-    std::vector<float> smoothedMagnitude;
-    float smoothingFactor = 0.3f; //tweak for smoothness, 0.1-0.5
 
     // circular FIFO holding the most recent fftSize samples
     std::vector<float> fifo;
@@ -44,4 +42,6 @@ private:
 
     // magnitude output (fftSize/2 bins)
     std::vector<float> magnitude;
+    std::vector<float> smoothedMagnitude;
+    float smoothingFactor = 0.3f; // tweak 0.1-0.5 for smoother display
 };

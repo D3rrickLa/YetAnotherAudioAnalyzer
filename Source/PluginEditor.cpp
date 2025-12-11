@@ -107,7 +107,7 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::paintSpectrumScreen(juce::Grap
     const int availableHeight = h - headerHeight;
 
     const int numBins = (int)mags.size();
-    const float binW = (float)w / (float)numBins;
+    //const float binW = (float)w / (float)numBins; 
 
     for (int i = 0; i < numBins; ++i)
     {
@@ -116,15 +116,18 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::paintSpectrumScreen(juce::Grap
         const float dbClamped = juce::jlimit(-100.0f, 0.0f, db);
 
         // map into area *below header*
-        float y = juce::jmap(dbClamped,
-            -100.0f, 0.0f,
-            (float)(h), (float)(headerHeight + 10));
+        float y = juce::jmap(dbClamped, -100.0f, 0.0f, (float)(h), (float)(headerHeight + 10));
+
+        float logX = std::log10(1 + 9 * i / (float)numBins);
+        float x = logX * w;
 
         g.setColour(juce::Colours::lightblue.withAlpha(0.9f));
-        g.fillRect(i * binW,
+        g.fillRect(
+            x,
             y,
-            juce::jmax(1.0f, binW - 1.0f),
-            (float)h - y);
+            juce::jmax(1.0f, x - 1.0f),
+            (float)h - y
+        );
     }
 
 }
