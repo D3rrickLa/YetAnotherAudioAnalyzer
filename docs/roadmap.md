@@ -99,3 +99,17 @@ Goal: Core functionality — must be stable, efficient, and visually clear.
 | M6        | Public Beta (MVP Release)          | Week 6 |
 | M7        | Feedback + Phase 2 design          | Week 8 |
 
+-------- Update 25-12-19
+Finished the spectrum analyzer (rough)
+Finished the correlation meter
+Finished the Lufs meter (rough, like jsut a number)
+Have a 'stereo width' analyzer? not really what I want. Needs to be like the Ozone UI, right now it's just a number
+
+NEXT:
+Mono / Stereo Toggle
+A and B Toggle? Honeslty, now thinking about it, don't know why I would have this... but will just add it
+Proper stereo width (the Ozone kind)
+A UI that is dog water
+performance fixes (speed)
+Spectrum analyzer 'leveling' really weird looking with lots of info in the lows
+
