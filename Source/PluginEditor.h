@@ -10,6 +10,7 @@
 
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
+#include <juce_core/juce_core.h>
 
 //==============================================================================
 /**
@@ -26,12 +27,20 @@ public:
     //==============================================================================
     void paint (juce::Graphics&) override;
     void resized() override;
-    void paintSpectrumScreen(juce::Graphics&, int headerHeight);
-    void drawFrequencyOverlay(juce::Graphics& g, int headerHeight);
-    void paintMultibandScreen(juce::Graphics&, int headerHeight);
+    void paintViewHeader(juce::Graphics& g);
+    void paintMainView(juce::Graphics& g);
+    void paintMeterFooter(juce::Graphics& g);
+
+    void paintSpectrumScreen(juce::Graphics&, juce::Rectangle<int> area);
+    void paintMultibandScreen(juce::Graphics&, juce::Rectangle<int> area);
+
+    void drawFrequencyOverlay(juce::Graphics& g, juce::Rectangle<int> area);
 
 private:
     void timerCallback();
+    float logX(int bin, int numBins, float width, float sampleRate);
+    float xToFrequency(float xNorm) const;
+    float interpolateMagnitude(const std::vector<float>& mags, float freq, float sampleRate);
     YetAnotherAudioAnalyzerAudioProcessor& audioProcessor;
 
     // Basic values from meters
@@ -39,6 +48,8 @@ private:
     float levelValue = 0.0f;
     float correlationValue = 1.0f;
     float widthValue = 0.0f;
+    float minDb = -90.0f;
+    float maxDb = 0.0f;
     ViewMode currentView = ViewMode::Spectrum;
     juce::TextButton viewSwitchButton{ "Switch View" };
 
