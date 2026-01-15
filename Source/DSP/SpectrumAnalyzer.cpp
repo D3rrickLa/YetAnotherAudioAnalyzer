@@ -1,5 +1,7 @@
 #include "SpectrumAnalyzer.h"
 
+
+
 SpectrumAnalyzer::SpectrumAnalyzer(int order)
     : fftOrder(order),
     fftSize(1 << order),
@@ -13,6 +15,13 @@ SpectrumAnalyzer::SpectrumAnalyzer(int order)
 {
     fifoIndex = 0;
     fifoWrapped = false;
+
+    hannWindow.resize(fftSize);
+    for (int i = 0; i < fftSize; ++i)
+    {
+        hannWindow[i] = 0.5f * (1.0f - std::cos(2.0 * juce::MathConstants<float>::pi * i / (fftSize - 1)));
+        windowSum += hannWindow[i];
+    }
 }
 
 void SpectrumAnalyzer::prepareToPlay(double, int)
@@ -61,13 +70,16 @@ void SpectrumAnalyzer::computeFFT()
 
     // Copy latest fftSize samples in chronological order
     for (int i = 0; i < fftSize; ++i)
-    {
-        int src = (fifoIndex + i) % fftSize;
-        fftData[i] = fifo[src];
-    }
+        fftData[i] = fifo[(fifoIndex + i) % fftSize];
 
+    // Zero-pad the rest
     std::fill(fftData.begin() + fftSize, fftData.end(), 0.0f);
-    window.multiplyWithWindowingTable(fftData.data(), fftSize);
+
+    // Apply Hann window manually
+    for (int i = 0; i < fftSize; ++i)
+        fftData[i] *= hannWindow[i];
+
+    // Perform FFT
     fft->performRealOnlyForwardTransform(fftData.data());
 
     const int numBins = fftSize / 2;
@@ -77,12 +89,17 @@ void SpectrumAnalyzer::computeFFT()
         smoothedMagnitude.resize(numBins);
     }
 
-    magnitude[0] = std::abs(fftData[0]);
+    // --- Correct magnitude with Hann window normalization ---
+    // DC bin
+    magnitude[0] = std::abs(fftData[0]) / windowSum;
+
     for (int bin = 1; bin < numBins; ++bin)
     {
-        const float re = fftData[2 * bin];
-        const float im = fftData[2 * bin + 1];
-        magnitude[bin] = std::sqrt(re * re + im * im);
+        float re = fftData[2 * bin];
+        float im = fftData[2 * bin + 1];
+
+        // Multiply by 2 for non-DC bins (FFT symmetry) and divide by window sum
+        magnitude[bin] = 2.0f * std::sqrt(re * re + im * im) / windowSum;
     }
 }
 
@@ -91,18 +108,36 @@ void SpectrumAnalyzer::updateSmoothedMagnitudes()
     const juce::ScopedLock sl(lock);
 
     const int numBins = (int)magnitude.size();
+    const float smoothingLow = smoothingFactor * 0.01f;  // very slow for bass
+    const float smoothingHigh = smoothingFactor;         // fast for treble
+
     for (int i = 0; i < numBins; ++i)
     {
-        // optional frequency-dependent smoothing (gentle)
         float freqRatio = (float)i / (float)numBins;
-        float factor = juce::jmap(freqRatio, 0.0f, 1.0f, smoothingFactor, smoothingFactor * 0.5f);
+        float factor = juce::jmap(freqRatio, 0.0f, 1.0f, smoothingLow, smoothingHigh);
 
-        smoothedMagnitude[i] = factor * magnitude[i] + (1.0f - factor) * smoothedMagnitude[i];
+        // RMS IIR smoothing
+        float prev = smoothedMagnitude[i];
+        smoothedMagnitude[i] = std::sqrt(
+            factor * magnitude[i] * magnitude[i] +
+            (1.0f - factor) * prev * prev
+        );
     }
 
-    // optional 3-bin moving average
-    for (int i = 1; i < numBins - 1; ++i)
-        smoothedMagnitude[i] = (smoothedMagnitude[i - 1] + smoothedMagnitude[i] + smoothedMagnitude[i + 1]) / 3.0f;
+    // Low-frequency averaging (20–80 Hz) to reduce spikes
+    int bassBins = juce::jmax(3, numBins / 32);
+    std::vector<float> temp = smoothedMagnitude;
+    for (int i = 0; i < bassBins; ++i)
+    {
+        int start = juce::jmax(0, i - 1);
+        int end = juce::jmin(bassBins - 1, i + 1);
+
+        float sum = 0.0f;
+        for (int j = start; j <= end; ++j)
+            sum += temp[j];
+
+        smoothedMagnitude[i] = sum / (end - start + 1);
+    }
 }
 
 std::vector<float> SpectrumAnalyzer::getMagnitudesCopy() const

@@ -48,7 +48,7 @@ private:
     float levelValue = 0.0f;
     float correlationValue = 1.0f;
     float widthValue = 0.0f;
-    float minDb = -90.0f;
+    float minDb = -60.0f;
     float maxDb = 0.0f;
     ViewMode currentView = ViewMode::Spectrum;
     juce::TextButton viewSwitchButton{ "Switch View" };

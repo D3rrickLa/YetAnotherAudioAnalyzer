@@ -38,6 +38,8 @@ private:
     std::vector<float> fftData;
     std::vector<float> magnitude;
     std::vector<float> smoothedMagnitude;
+    std::vector<float> hannWindow;
 
+    float windowSum = 0.0f;
     float smoothingFactor = 0.5f; // tweak 0.3-0.7 for smoothness
 };

@@ -25,7 +25,7 @@ YetAnotherAudioAnalyzerAudioProcessorEditor::YetAnotherAudioAnalyzerAudioProcess
 {
     // Make sure that before the constructor has finished, you've set the
     // editor's size to whatever you need it to be.
-    setSize(800, 400);
+    setSize(1280, 720);
 
 
     addAndMakeVisible(viewSwitchButton);
@@ -59,9 +59,6 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::timerCallback()
     leftMagnitudes = audioProcessor.getSpectrumAnalyzerL().getMagnitudesCopy();
     rightMagnitudes = audioProcessor.getSpectrumAnalyzerR().getMagnitudesCopy();
 
-    // get copies for GUI
-    leftMagnitudes = audioProcessor.getSpectrumAnalyzerL().getMagnitudesCopy();
-    rightMagnitudes = audioProcessor.getSpectrumAnalyzerR().getMagnitudesCopy();
 
     // level: prefer integrated, otherwise last-block
     if (audioProcessor.getLevelMeter().hasIntegratedLufs())
@@ -148,32 +145,61 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::paintSpectrumScreen(
     juce::Graphics& g, juce::Rectangle<int> area)
 {
     const auto& mags = leftMagnitudes;
-    if (mags.empty()) return;
+    if (mags.empty())
+        return;
 
     juce::Path spectrumPath;
     spectrumPath.preallocateSpace(area.getWidth() * 3);
 
-    const float minDb = -90.0f;
+    const float minDb = -60.0f;
     const float maxDb = 0.0f;
+    const float refAmplitude = 1.0f;
+
+    const int numBins = (int)mags.size();
+    const float nyquist = audioProcessor.getSampleRate() * 0.5f;
+
+    const float logMin = std::log10(20.0f);
+    const float logMax = std::log10(nyquist);
 
     for (int x = 0; x < area.getWidth(); ++x)
     {
         float xNorm = (float)x / (float)(area.getWidth() - 1);
-        float freq = xToFrequency(xNorm);
+        float logFreqLeft = logMin + xNorm * (logMax - logMin);
+        float logFreqRight = logMin + (xNorm + 1.0f / area.getWidth()) * (logMax - logMin);
 
-        float mag = interpolateMagnitude(
-            mags, freq, audioProcessor.getSampleRate());
+        float freqLeft = std::pow(10.0f, logFreqLeft);
+        float freqRight = std::pow(10.0f, logFreqRight);
 
-        float db = juce::Decibels::gainToDecibels(mag + 1e-12f);
+        int binLeft = juce::jlimit(0, numBins - 1, (int)std::floor(freqLeft / nyquist * (numBins - 1)));
+        int binRight = juce::jlimit(0, numBins - 1, (int)std::ceil(freqRight / nyquist * (numBins - 1)));
 
-        float y = juce::jmap(db,
-            minDb, maxDb,
-            (float)area.getBottom(),
-            (float)area.getY());
+        // --- Average all bins in this pixel ---
+        float mag = 0.0f;
+        int count = 0;
+        for (int b = binLeft; b <= binRight; ++b)
+        {
+            // Noise floor suppression
+            if (mags[b] > 1e-5f)
+            {
+                mag += mags[b];
+                count++;
+            }
+        }
+        if (count > 0)
+            mag /= (float)count;
+        else
+            mag = 1e-6f; // minimal visible floor
 
-        y = juce::jlimit((float)area.getY(),
-            (float)area.getBottom(),
-            y);
+        // Optional low-frequency smoothing
+        float freqCenter = (freqLeft + freqRight) * 0.5f;
+        if (freqCenter < 200.0f)
+            mag *= 0.6f + 0.4f * (freqCenter / 200.0f); // slope from 0 to 200Hz
+
+        // Convert to dB
+        float db = juce::Decibels::gainToDecibels(mag / refAmplitude);
+        db = juce::jlimit(minDb, maxDb, db);
+
+        float y = juce::jmap(db, minDb, maxDb, (float)area.getBottom(), (float)area.getY());
 
         if (x == 0)
             spectrumPath.startNewSubPath(area.getX(), y);
@@ -181,9 +207,11 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::paintSpectrumScreen(
             spectrumPath.lineTo(area.getX() + x, y);
     }
 
+    // Draw spectrum
     g.setColour(juce::Colours::lightblue);
     g.strokePath(spectrumPath, juce::PathStrokeType(1.5f));
 
+    // Draw frequency overlay & grid
     drawFrequencyOverlay(g, area);
 }
 
@@ -211,7 +239,6 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::drawFrequencyOverlay(juce::Gra
         float x = area.getX() + xNorm * area.getWidth();
         float labelX = juce::jlimit((float)area.getX(), (float)(area.getRight() - 36), x - 18.0f);
 
-
         g.drawLine(x, (float)area.getY(), x, (float)area.getBottom(), 1.0f);
 
         g.drawText(juce::String((int)f),
@@ -221,20 +248,17 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::drawFrequencyOverlay(juce::Gra
                    juce::Justification::centred);
     }
 
-    for (float db = minDb; db <= maxDb; db += 6.0f)
+    for (float db = 0.0f; db >= minDb; db -= 10.0f)
     {
-        float y = juce::jmap(db, minDb, maxDb,
-            (float)area.getBottom(),
-            (float)area.getY());
-
-        g.setColour(db == 0 ? juce::Colours::white : juce::Colours::white.withAlpha(0.15f));
+        float y = juce::jmap(db, minDb, maxDb, (float)area.getBottom(), (float)area.getY());
         g.drawHorizontalLine((int)y, (float)area.getX(), (float)area.getRight());
-
         g.drawText(juce::String((int)db),
-            area.getX() + 4, (int)y - 8,
+            area.getX() + 4,
+            (int)y - 8,
             40, 16,
             juce::Justification::left);
     }
+
 }
 
 
@@ -278,13 +302,15 @@ float YetAnotherAudioAnalyzerAudioProcessorEditor::interpolateMagnitude(
     float freq,
     float sampleRate)
 {
-    float nyquist = sampleRate * 0.5f;
-    float binFloat = (freq / nyquist) * mags.size();
+    if (mags.empty()) return 0.0f;
 
-    int bin0 = (int)std::floor(binFloat);
+    const float nyquist = sampleRate * 0.5f;
+    freq = juce::jlimit(0.0f, nyquist, freq);
+
+    float binFloat = (freq / nyquist) * (float)(mags.size() - 1); // -1 because last bin index = size-1
+    int bin0 = juce::jlimit(0, (int)mags.size() - 1, (int)std::floor(binFloat));
     int bin1 = juce::jmin(bin0 + 1, (int)mags.size() - 1);
 
     float frac = binFloat - bin0;
-
     return juce::jmap(frac, mags[bin0], mags[bin1]);
 }
