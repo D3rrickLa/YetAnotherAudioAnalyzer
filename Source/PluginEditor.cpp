@@ -144,8 +144,9 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::paintMeterFooter(juce::Graphic
 void YetAnotherAudioAnalyzerAudioProcessorEditor::paintSpectrumScreen(
     juce::Graphics& g, juce::Rectangle<int> area)
 {
-    const auto& mags = leftMagnitudes;
-    if (mags.empty())
+    const auto& magsL = leftMagnitudes;
+    const auto& magsR = rightMagnitudes;
+    if (magsL.empty() || magsR.empty())
         return;
 
     juce::Path spectrumPath;
@@ -153,10 +154,15 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::paintSpectrumScreen(
 
     const float minDb = -60.0f;
     const float maxDb = 0.0f;
-    const float refAmplitude = 1.0f;
-
-    const int numBins = (int)mags.size();
+    const float refAmplitude = 1.0f; // full-scale reference
+    const int numBins = (int)magsL.size();
     const float nyquist = audioProcessor.getSampleRate() * 0.5f;
+
+    // SPAN-style smoothing parameters
+    static std::vector<float> smoothed(area.getWidth(), 0.0f);
+    const float attack = 0.6f;   // fast attack for peaks
+    const float releaseLow = 0.02f;   // low frequencies decay fast
+    const float releaseHigh = 0.25f;  // high frequencies decay slower
 
     const float logMin = std::log10(20.0f);
     const float logMax = std::log10(nyquist);
@@ -164,41 +170,43 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::paintSpectrumScreen(
     for (int x = 0; x < area.getWidth(); ++x)
     {
         float xNorm = (float)x / (float)(area.getWidth() - 1);
-        float logFreqLeft = logMin + xNorm * (logMax - logMin);
-        float logFreqRight = logMin + (xNorm + 1.0f / area.getWidth()) * (logMax - logMin);
+        float logFreq = logMin + xNorm * (logMax - logMin);
+        float freq = std::pow(10.0f, logFreq);
 
-        float freqLeft = std::pow(10.0f, logFreqLeft);
-        float freqRight = std::pow(10.0f, logFreqRight);
+        // fractional bin index
+        float binFloat = freq / nyquist * (numBins - 1);
+        int bin0 = (int)std::floor(binFloat);
+        int bin1 = juce::jmin(bin0 + 1, numBins - 1);
+        float frac = binFloat - bin0;
 
-        int binLeft = juce::jlimit(0, numBins - 1, (int)std::floor(freqLeft / nyquist * (numBins - 1)));
-        int binRight = juce::jlimit(0, numBins - 1, (int)std::ceil(freqRight / nyquist * (numBins - 1)));
+        // Linear interpolation between bins
+        float mag = 0.5f * (magsL[bin0] + magsR[bin0]) * (1.0f - frac)
+            + 0.5f * (magsL[bin1] + magsR[bin1]) * frac;
 
-        // --- Average all bins in this pixel ---
-        float mag = 0.0f;
-        int count = 0;
-        for (int b = binLeft; b <= binRight; ++b)
+        // Optional low-frequency visual slope (20–200 Hz)
+        if (freq < 200.0f)
         {
-            // Noise floor suppression
-            if (mags[b] > 1e-5f)
-            {
-                mag += mags[b];
-                count++;
-            }
+            float slope = 0.6f + 0.4f * (freq / 200.0f);
+            mag *= slope;
         }
-        if (count > 0)
-            mag /= (float)count;
-        else
-            mag = 1e-6f; // minimal visible floor
 
-        // Optional low-frequency smoothing
-        float freqCenter = (freqLeft + freqRight) * 0.5f;
-        if (freqCenter < 200.0f)
-            mag *= 0.6f + 0.4f * (freqCenter / 200.0f); // slope from 0 to 200Hz
+        // Clamp linear magnitude to 1.0 to avoid dB clipping
+        mag = juce::jmin(mag, 1.0f);
+
+        // --- Dynamic smoothing (frequency-dependent release) ---
+        float freqRatio = (float)xNorm; // 0 = low, 1 = high
+        float release = juce::jmap(freqRatio, 0.0f, 1.0f, releaseLow, releaseHigh);
+
+        if (mag > smoothed[x])
+            smoothed[x] = attack * mag + (1.0f - attack) * smoothed[x]; // fast attack
+        else
+            smoothed[x] = release * mag + (1.0f - release) * smoothed[x]; // frequency-dependent decay
 
         // Convert to dB
-        float db = juce::Decibels::gainToDecibels(mag / refAmplitude);
+        float db = juce::Decibels::gainToDecibels(smoothed[x] / refAmplitude);
         db = juce::jlimit(minDb, maxDb, db);
 
+        // Map to vertical pixel
         float y = juce::jmap(db, minDb, maxDb, (float)area.getBottom(), (float)area.getY());
 
         if (x == 0)
@@ -233,32 +241,44 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::drawFrequencyOverlay(juce::Gra
     float logMin = std::log10(20.0f);
     float logMax = std::log10(audioProcessor.getSampleRate() / 2.0f);
 
-    for (float f : freqs)
-    {
-        float xNorm = (std::log10(f) - logMin) / (logMax - logMin);
-        float x = area.getX() + xNorm * area.getWidth();
-        float labelX = juce::jlimit((float)area.getX(), (float)(area.getRight() - 36), x - 18.0f);
+    // Allocate a left bar for dB scale
+    const int dbBarWidth = 40; // adjust as needed
+    juce::Rectangle<float> plotArea = area.toFloat();
+    plotArea.removeFromLeft((float)dbBarWidth); // spectrum area reduced
 
-        g.drawLine(x, (float)area.getY(), x, (float)area.getBottom(), 1.0f);
-
-        g.drawText(juce::String((int)f),
-                   (int)labelX,
-                   area.getBottom() - 16,
-                   36, 14,
-                   juce::Justification::centred);
-    }
+    // --- Horizontal dB lines & labels (in the dbBar area) ---
+    const int marginYTop = 4;
+    const int marginYBottom = 20;
+    plotArea.setY(plotArea.getY() + marginYTop);
+    plotArea.setHeight(plotArea.getHeight() - marginYTop - marginYBottom);
 
     for (float db = 0.0f; db >= minDb; db -= 10.0f)
     {
-        float y = juce::jmap(db, minDb, maxDb, (float)area.getBottom(), (float)area.getY());
-        g.drawHorizontalLine((int)y, (float)area.getX(), (float)area.getRight());
+        float y = juce::jmap(db, minDb, maxDb, plotArea.getBottom(), plotArea.getY());
+        g.drawHorizontalLine((int)y, plotArea.getX(), plotArea.getRight());
         g.drawText(juce::String((int)db),
-            area.getX() + 4,
-            (int)y - 8,
-            40, 16,
-            juce::Justification::left);
+            area.getX() + 2,    // inside left bar
+            (int)(y - 8),
+            dbBarWidth - 4,     // label width inside bar
+            16,
+            juce::Justification::right);
     }
 
+    // --- Vertical frequency lines & labels ---
+    for (float f : freqs)
+    {
+        float xNorm = (std::log10(f) - logMin) / (logMax - logMin);
+        float x = plotArea.getX() + xNorm * plotArea.getWidth();
+        float labelX = juce::jlimit(plotArea.getX(), plotArea.getRight() - 36.0f, x - 18.0f);
+
+        g.drawLine(x, plotArea.getY(), x, plotArea.getBottom(), 1.0f);
+
+        g.drawText(juce::String((int)f),
+            (int)labelX,
+            (int)(plotArea.getBottom() + 2), // below spectrum
+            36, 14,
+            juce::Justification::centred);
+    }
 }
 
 
