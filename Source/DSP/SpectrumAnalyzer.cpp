@@ -124,7 +124,7 @@ void SpectrumAnalyzer::updateSmoothedMagnitudes()
         );
     }
 
-    // Low-frequency averaging (20–80 Hz) to reduce spikes
+    // Low-frequency averaging (20â€“80 Hz) to reduce spikes
     int bassBins = juce::jmax(3, numBins / 32);
     std::vector<float> temp = smoothedMagnitude;
     for (int i = 0; i < bassBins; ++i)
