@@ -154,18 +154,21 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::paintSpectrumScreen(
 
     const float minDb = -60.0f;
     const float maxDb = 0.0f;
-    const float refAmplitude = 1.0f; // full-scale reference
+    const float refAmplitude = 1.0f;
     const int numBins = (int)magsL.size();
     const float nyquist = audioProcessor.getSampleRate() * 0.5f;
 
-    // SPAN-style smoothing parameters
+    // SPAN-style smoothing per pixel
     static std::vector<float> smoothed(area.getWidth(), 0.0f);
-    const float attack = 0.6f;   // fast attack for peaks
-    const float releaseLow = 0.02f;   // low frequencies decay fast
-    const float releaseHigh = 0.25f;  // high frequencies decay slower
+    const float attack = 0.6f;     // fast attack
+    const float releaseLow = 0.02f; // low freq decay
+    const float releaseHigh = 0.25f; // high freq decay
 
     const float logMin = std::log10(20.0f);
     const float logMax = std::log10(nyquist);
+
+    // Compute peak for adaptive scaling
+    float globalPeak = 0.0f;
 
     for (int x = 0; x < area.getWidth(); ++x)
     {
@@ -179,35 +182,47 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::paintSpectrumScreen(
         int bin1 = juce::jmin(bin0 + 1, numBins - 1);
         float frac = binFloat - bin0;
 
-        // Linear interpolation between bins
+        // Stereo-averaged magnitude
         float mag = 0.5f * (magsL[bin0] + magsR[bin0]) * (1.0f - frac)
             + 0.5f * (magsL[bin1] + magsR[bin1]) * frac;
 
-        // Optional low-frequency visual slope (20–200 Hz)
+        // Optional low-frequency slope (20–200 Hz)
         if (freq < 200.0f)
-        {
-            float slope = 0.6f + 0.4f * (freq / 200.0f);
-            mag *= slope;
-        }
+            mag *= 0.6f + 0.4f * (freq / 200.0f);
 
-        // Clamp linear magnitude to 1.0 to avoid dB clipping
-        mag = juce::jmin(mag, 1.0f);
+        globalPeak = juce::jmax(globalPeak, mag);
 
-        // --- Dynamic smoothing (frequency-dependent release) ---
-        float freqRatio = (float)xNorm; // 0 = low, 1 = high
+        // Store temporarily for smoothing
+        smoothed[x] = mag;
+    }
+
+    // Optional: adaptive scaling for bass-heavy peaks
+    float scale = juce::jmax(1.0f, globalPeak);
+    for (int x = 0; x < area.getWidth(); ++x)
+        smoothed[x] /= scale;
+
+    // Apply dynamic smoothing per pixel and map to dB
+    for (int x = 0; x < area.getWidth(); ++x)
+    {
+        float freqRatio = (float)x / (float)area.getWidth();
         float release = juce::jmap(freqRatio, 0.0f, 1.0f, releaseLow, releaseHigh);
 
-        if (mag > smoothed[x])
-            smoothed[x] = attack * mag + (1.0f - attack) * smoothed[x]; // fast attack
+        // Dynamic smoothing
+        if (smoothed[x] > smoothed[x])
+            smoothed[x] = attack * smoothed[x] + (1.0f - attack) * smoothed[x];
         else
-            smoothed[x] = release * mag + (1.0f - release) * smoothed[x]; // frequency-dependent decay
+            smoothed[x] = release * smoothed[x] + (1.0f - release) * smoothed[x];
+
+        // Clamp linear magnitude
+        float mag = juce::jmin(smoothed[x], 1.0f);
 
         // Convert to dB
-        float db = juce::Decibels::gainToDecibels(smoothed[x] / refAmplitude);
+        float db = juce::Decibels::gainToDecibels(mag / refAmplitude);
         db = juce::jlimit(minDb, maxDb, db);
 
         // Map to vertical pixel
         float y = juce::jmap(db, minDb, maxDb, (float)area.getBottom(), (float)area.getY());
+        y = juce::jlimit((float)area.getY(), (float)area.getBottom(), y);
 
         if (x == 0)
             spectrumPath.startNewSubPath(area.getX(), y);
