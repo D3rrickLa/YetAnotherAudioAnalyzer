@@ -16,13 +16,15 @@
 /**
 */
 
-enum class ViewMode { Spectrum, MultibandCorrelation, AdvanceLufs };
+enum class ViewMode { Spectrum, MultibandCorrelation, StereoWidth, AdvanceLufs };
 
 class YetAnotherAudioAnalyzerAudioProcessorEditor  : public juce::AudioProcessorEditor, private juce::Timer
 {
 public:
     YetAnotherAudioAnalyzerAudioProcessorEditor (YetAnotherAudioAnalyzerAudioProcessor&);
     ~YetAnotherAudioAnalyzerAudioProcessorEditor() override;
+
+    void setView(ViewMode newView);
 
     //==============================================================================
     void paint (juce::Graphics&) override;
@@ -33,6 +35,8 @@ public:
 
     void paintSpectrumScreen(juce::Graphics&, juce::Rectangle<int> area);
     void paintMultibandScreen(juce::Graphics&, juce::Rectangle<int> area);
+    void paintStereoWidthScreen(juce::Graphics&, juce::Rectangle<int> area);
+    void paintLufsScreen(juce::Graphics&, juce::Rectangle<int> area);
 
     void drawFrequencyOverlay(juce::Graphics& g, juce::Rectangle<int> area);
 
@@ -51,7 +55,14 @@ private:
     float minDb = -60.0f;
     float maxDb = 0.0f;
     ViewMode currentView = ViewMode::Spectrum;
-    juce::TextButton viewSwitchButton{ "Switch View" };
+
+    juce::Rectangle<int> mainViewArea;
+    juce::Rectangle<int> meterFooterArea;
+
+    juce::TextButton multibandCorrelationTab { "Multiband Correlation" };
+    juce::TextButton spectrumTab{ "Spectrum" };
+    juce::TextButton stereoTab{ "Stereo" };
+    juce::TextButton lufsTab{ "LUFS" };
 
 
 

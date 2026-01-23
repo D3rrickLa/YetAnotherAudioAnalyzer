@@ -16,7 +16,7 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
-constexpr int viewHeaderHeight = 40;
+constexpr int viewHeaderHeight = 60;
 constexpr int meterFooterHeight = 60;
 
 //==============================================================================
@@ -28,19 +28,15 @@ YetAnotherAudioAnalyzerAudioProcessorEditor::YetAnotherAudioAnalyzerAudioProcess
     setSize(1280, 720);
 
 
-    addAndMakeVisible(viewSwitchButton);
-    viewSwitchButton.setButtonText("Switch View");
+    addAndMakeVisible(spectrumTab);
+    addAndMakeVisible(multibandCorrelationTab);
+    addAndMakeVisible(stereoTab);
+    addAndMakeVisible(lufsTab);
 
-
-    viewSwitchButton.onClick = [this]()
-        {
-            if (currentView == ViewMode::Spectrum)
-                currentView = ViewMode::MultibandCorrelation;
-            else
-                currentView = ViewMode::Spectrum;
-
-            repaint();
-        };
+    spectrumTab.onClick = [this]() { setView(ViewMode::Spectrum); };
+    multibandCorrelationTab.onClick = [this]() { setView(ViewMode::MultibandCorrelation); };
+    stereoTab.onClick = [this]() { setView(ViewMode::StereoWidth); };
+    lufsTab.onClick = [this]() { setView(ViewMode::AdvanceLufs); };
 
 
     // Update GUI 30 times per second
@@ -49,6 +45,15 @@ YetAnotherAudioAnalyzerAudioProcessorEditor::YetAnotherAudioAnalyzerAudioProcess
 
 YetAnotherAudioAnalyzerAudioProcessorEditor::~YetAnotherAudioAnalyzerAudioProcessorEditor()
 {
+}
+
+void YetAnotherAudioAnalyzerAudioProcessorEditor::setView(ViewMode newView)
+{
+    if (currentView == newView)
+        return;
+
+    currentView = newView;
+    repaint();
 }
 
 void YetAnotherAudioAnalyzerAudioProcessorEditor::timerCallback()
@@ -78,6 +83,18 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::paint(juce::Graphics& g)
 {
     g.fillAll(juce::Colours::grey);
 
+    auto highlightTab = [this](juce::TextButton& b, ViewMode mode)
+        {
+            b.setColour(juce::TextButton::buttonColourId,currentView == mode ? juce::Colours::darkgrey
+                : juce::Colours::black);
+        };
+
+    highlightTab(spectrumTab, ViewMode::Spectrum);
+    highlightTab(multibandCorrelationTab, ViewMode::MultibandCorrelation);
+    highlightTab(stereoTab, ViewMode::StereoWidth);
+    highlightTab(lufsTab, ViewMode::AdvanceLufs);
+
+
     paintViewHeader(g);
     paintMainView(g);
     paintMeterFooter(g);
@@ -86,58 +103,83 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::paint(juce::Graphics& g)
 
 void YetAnotherAudioAnalyzerAudioProcessorEditor::paintViewHeader(juce::Graphics& g)
 {
+    // brack BG ONLY
     g.setColour(juce::Colours::darkgrey.darker(0.2f));
     g.fillRect(0, 0, getWidth(), viewHeaderHeight);
 
     g.setColour(juce::Colours::white);
     g.setFont(14.0f);
 
-    g.drawText("View:",
-        10, 0, 60, viewHeaderHeight,
-        juce::Justification::centredLeft);
 }
 
 void YetAnotherAudioAnalyzerAudioProcessorEditor::paintMainView(juce::Graphics& g)
 {
-    auto area = juce::Rectangle<int>(
+    mainViewArea = juce::Rectangle<int> (
         0,
         viewHeaderHeight,
         getWidth(),
-        getHeight() - viewHeaderHeight - meterFooterHeight);
+        getHeight() - viewHeaderHeight - meterFooterHeight
+    );
 
-    juce::Graphics::ScopedSaveState state(g); // doesn't affect other ddrawings
-    g.reduceClipRegion(area);
+    // Add padding (all sides)
+    int paddingLeft = 50;
+    int paddingRight = 20;
+    int paddingTop = 10;
+    int paddingBottom = 20;
 
-    if (currentView == ViewMode::Spectrum)
-        paintSpectrumScreen(g, area);
-    else
-        paintMultibandScreen(g, area);
+    juce::Rectangle<int> paddedArea = mainViewArea
+        .reduced(paddingLeft, paddingTop)
+        .withWidth(mainViewArea.getWidth() - paddingLeft - paddingRight)
+        .withHeight(mainViewArea.getHeight() - paddingTop - paddingBottom);
+    // Clip drawing to main view only
+    juce::Graphics::ScopedSaveState state(g);
+    g.reduceClipRegion(mainViewArea);
+
+    // Draw the active view based on current tab
+    switch (currentView)
+    {
+    case ViewMode::Spectrum:
+        paintSpectrumScreen(g, mainViewArea);
+        break;
+
+    case ViewMode::MultibandCorrelation:
+        paintMultibandScreen(g, mainViewArea);
+        break;
+
+    case ViewMode::StereoWidth:
+        paintStereoWidthScreen(g, mainViewArea);
+        break;
+
+    case ViewMode::AdvanceLufs:
+        paintLufsScreen(g, mainViewArea);
+        break;
+    }
 }
 
 void YetAnotherAudioAnalyzerAudioProcessorEditor::paintMeterFooter(juce::Graphics& g)
 {
-    auto area = juce::Rectangle<int>(
+    meterFooterArea = juce::Rectangle<int>(
         0,
         getHeight() - meterFooterHeight,
         getWidth(),
         meterFooterHeight);
 
     g.setColour(juce::Colours::darkgrey.darker(0.4f));
-    g.fillRect(area);
+    g.fillRect(meterFooterArea);
 
     g.setColour(juce::Colours::white);
     g.setFont(14.0f);
 
     g.drawText("LUFS: " + juce::String(levelValue, 2),
-        area.removeFromLeft(120),
+        meterFooterArea.removeFromLeft(120),
         juce::Justification::centred);
 
     g.drawText("Corr: " + juce::String(correlationValue, 2),
-        area.removeFromLeft(120),
+        meterFooterArea.removeFromLeft(120),
         juce::Justification::centred);
 
     g.drawText("Width: " + juce::String(widthValue, 2),
-        area.removeFromLeft(120),
+        meterFooterArea.removeFromLeft(120),
         juce::Justification::centred);
 }
 
@@ -246,6 +288,23 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::paintMultibandScreen(juce::Gra
         juce::Justification::centredLeft);
 }
 
+void YetAnotherAudioAnalyzerAudioProcessorEditor::paintStereoWidthScreen(juce::Graphics& g, juce::Rectangle<int> area)
+{
+    g.setColour(juce::Colours::white);
+    g.drawText("Stereo Width screen (WIP)",
+        area.reduced(20),
+        juce::Justification::centredLeft);
+}
+
+void YetAnotherAudioAnalyzerAudioProcessorEditor::paintLufsScreen(juce::Graphics& g, juce::Rectangle<int> area)
+{
+    g.setColour(juce::Colours::white);
+    g.drawText("LUFS screen (WIP)",
+        area.reduced(20),
+        juce::Justification::centredLeft);
+}
+
+
 void YetAnotherAudioAnalyzerAudioProcessorEditor::drawFrequencyOverlay(juce::Graphics& g, juce::Rectangle<int> area)
 {
     g.setColour(juce::Colours::white.withAlpha(0.5f));
@@ -296,12 +355,38 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::drawFrequencyOverlay(juce::Gra
     }
 }
 
-
 void YetAnotherAudioAnalyzerAudioProcessorEditor::resized()
 {
-    const int headerHeight = 50;
+    auto bounds = getLocalBounds(); // full editor rectangle
 
-    viewSwitchButton.setBounds(10, 10, 150, 30);
+    // --------------------
+    // Top Tab Bar
+    // --------------------
+    auto tabBarHeight = 40;
+    auto tabBar = bounds.removeFromTop(tabBarHeight);
+
+    int tabWidth = 120; // fixed width per tab
+    spectrumTab.setBounds(tabBar.removeFromLeft(tabWidth));
+    multibandCorrelationTab.setBounds(tabBar.removeFromLeft(tabWidth));
+    stereoTab.setBounds(tabBar.removeFromLeft(tabWidth));
+    lufsTab.setBounds(tabBar.removeFromLeft(tabWidth));
+
+    // You can leave extra tabBar space for future tabs
+    // auto extraTabSpace = tabBar; 
+
+    // --------------------
+    // Bottom Meter/Footer
+    // --------------------
+    auto footerHeight = meterFooterHeight; // use your existing constant
+    meterFooterArea = bounds.removeFromBottom(footerHeight);
+    // meterFooterArea is now available for paintMeterFooter()
+
+    // --------------------
+    // Main View Area
+    // --------------------
+    mainViewArea = bounds;
+    // everything left in "bounds" is now the main view
+    // paintMainView() will use mainViewArea
 }
 
 float YetAnotherAudioAnalyzerAudioProcessorEditor::logX(int bin, int numBins, float width, float sampleRate)
