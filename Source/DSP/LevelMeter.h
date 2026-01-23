@@ -35,6 +35,9 @@ public:
     // immediate fallback so GUI shows something quickly
     float getLastBlockLufs() const noexcept;
 
+    std::atomic<float> lastBlockRmsL{ 0.0f };
+    std::atomic<float> lastBlockRmsR{ 0.0f };
+
 private:
     void finalizeBlock();
 
@@ -63,4 +66,5 @@ private:
     std::atomic<float> integratedLufs;
     std::atomic<bool> integratedValid;
     std::atomic<float> lastBlockLufs;
+
 };

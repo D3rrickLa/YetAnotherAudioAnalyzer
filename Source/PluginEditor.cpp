@@ -19,16 +19,6 @@
 constexpr int viewHeaderHeight = 40;
 constexpr int meterFooterHeight = 40;
 
-float mapLufsToNormalized(float lufs)
-{
-    // clamp lufs to [-60, 0] range
-    lufs = juce::jlimit(-60.0f, 0.0f, lufs);
-
-    // map to 0 → 1 (0 = −60 LUFS, 1 = 0 LUFS)
-    return juce::jmap(lufs, -60.0f, 0.0f, 0.0f, 1.0f);
-}
-
-
 //==============================================================================
 YetAnotherAudioAnalyzerAudioProcessorEditor::YetAnotherAudioAnalyzerAudioProcessorEditor(YetAnotherAudioAnalyzerAudioProcessor& p) 
     : AudioProcessorEditor(&p), audioProcessor(p)
@@ -71,29 +61,38 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::setView(ViewMode newView)
 
 void YetAnotherAudioAnalyzerAudioProcessorEditor::timerCallback()
 {
-    // Spectrum
     audioProcessor.getSpectrumAnalyzerL().updateSmoothedMagnitudes();
     audioProcessor.getSpectrumAnalyzerR().updateSmoothedMagnitudes();
 
-    leftMagnitudes  = audioProcessor.getSpectrumAnalyzerL().getMagnitudesCopy();
+    leftMagnitudes = audioProcessor.getSpectrumAnalyzerL().getMagnitudesCopy();
     rightMagnitudes = audioProcessor.getSpectrumAnalyzerR().getMagnitudesCopy();
 
     // LUFS / level
-    float lufs = 0.0f;
-    if (audioProcessor.getLevelMeter().hasIntegratedLufs())
-        lufs = audioProcessor.getLevelMeter().getIntegratedLufs();
-    else
-        lufs = audioProcessor.getLevelMeter().getLastBlockLufs();
+    float lufs = audioProcessor.getLevelMeter().hasIntegratedLufs() ?
+        audioProcessor.getLevelMeter().getIntegratedLufs() :
+        audioProcessor.getLevelMeter().getLastBlockLufs();
 
-    levelValue = lufs; // optional, keep for display
+    levelValue = lufs;
 
-    // Map to normalized value for vertical meters
-    leftLevel  = mapLufsToNormalized(audioProcessor.getLevelMeter().getLastBlockLufs());  // left channel approximation
-    rightLevel = mapLufsToNormalized(audioProcessor.getLevelMeter().getLastBlockLufs());  // right channel approximation
-
-    // Correlation / width
     correlationValue = audioProcessor.getCorrelationMeter().getCorrelation();
     audioProcessor.getStereoWidthMeter().getResults(correlationValue, widthValue);
+    
+    // Load current RMS
+    float rawLeft = audioProcessor.getLevelMeter().lastBlockRmsL.load();
+    float rawRight = audioProcessor.getLevelMeter().lastBlockRmsR.load();
+
+    // Smooth
+    smoothedLeft += (rawLeft - smoothedLeft) * smoothingFactor;
+    smoothedRight += (rawRight - smoothedRight) * smoothingFactor;
+
+    // Update peak (hold)
+    peakLeft = juce::jmax(peakLeft, smoothedLeft);
+    peakRight = juce::jmax(peakRight, smoothedRight);
+
+    // Decay peak slowly
+    peakLeft = juce::jmax(peakLeft - peakDecay, smoothedLeft);
+    peakRight = juce::jmax(peakRight - peakDecay, smoothedRight);
+
 
     repaint();
 }
@@ -151,66 +150,40 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::paintMeterFooter(juce::Graphic
     juce::Graphics::ScopedSaveState state(g);
     g.reduceClipRegion(meterFooterArea);
 
-    g.setColour(juce::Colours::darkgrey.darker(0.1f));
+    // Footer background
+    g.setColour(juce::Colours::darkgrey);
     g.fillRect(meterFooterArea);
 
-    int meterHeight = 12;
-    int meterSpacing = 10;
-    int startX = abButton.getRight() + 20;
-    int startY = meterFooterArea.getY() + 15;
-
-    // --------------------
-    // Correlation meter
-    // --------------------
-    int corrWidth = 100;
-    g.setColour(juce::Colours::grey.darker(0.5f));
-    g.fillRect(startX, startY, corrWidth, meterHeight);
-
-    // Indicator
-    int indicatorX = juce::jmap(correlationValue, -1.0f, 1.0f, 0.0f, (float)corrWidth);
-    g.setColour(juce::Colours::limegreen);
-    g.fillRect(startX + indicatorX - 2, startY, 4, meterHeight);
-
-    // --------------------
-    // Stereo width meter
-    // --------------------
-    int widthMeterX = startX + corrWidth + meterSpacing;
-    int widthMeterW = 100;
-
-    g.setColour(juce::Colours::grey.darker(0.5f));
-    g.fillRect(widthMeterX, startY, widthMeterW, meterHeight);
-
-    int fillWidth = (int)(widthValue * widthMeterW);
-    g.setColour(juce::Colours::deepskyblue);
-    g.fillRect(widthMeterX, startY, fillWidth, meterHeight);
-
-    // --------------------
-    // Level meter strip (vertical)
-    // --------------------
     int lmX = levelMeterArea.getX();
     int lmY = levelMeterArea.getY();
     int lmW = levelMeterArea.getWidth();
     int lmH = levelMeterArea.getHeight();
 
-    // Draw background
-    g.setColour(juce::Colours::grey.darker(0.5f));
-    g.fillRect(lmX, lmY, lmW, lmH);
+    // ---------------- Vertical level bars ----------------
+    int leftFill = int(smoothedLeft * lmH);
+    int rightFill = int(smoothedRight * lmH);
 
-    int leftFill = int(leftLevel * levelMeterArea.getHeight());
-    int rightFill = int(rightLevel * levelMeterArea.getHeight());
+    leftFill = juce::jmax(leftFill, 2);
+    rightFill = juce::jmax(rightFill, 2);
 
+    // Left channel
     g.setColour(juce::Colours::limegreen);
-    g.fillRect(levelMeterArea.getX(),
-        levelMeterArea.getBottom() - leftFill,
-        levelMeterArea.getWidth() / 2,
-        leftFill);
+    g.fillRect(lmX, lmY + (lmH - leftFill), lmW / 2, leftFill);
 
+    // Right channel
     g.setColour(juce::Colours::deepskyblue);
-    g.fillRect(levelMeterArea.getX() + levelMeterArea.getWidth() / 2,
-        levelMeterArea.getBottom() - rightFill,
-        levelMeterArea.getWidth() / 2,
-        rightFill);
+    g.fillRect(lmX + lmW / 2, lmY + (lmH - rightFill), lmW / 2, rightFill);
+
+    // Peaks
+    int peakLeftY = lmY + (lmH - int(peakLeft * lmH));
+    int peakRightY = lmY + (lmH - int(peakRight * lmH));
+
+    g.setColour(juce::Colours::yellow);
+    g.fillRect(lmX, peakLeftY, lmW / 2, 2);
+    g.fillRect(lmX + lmW / 2, peakRightY, lmW / 2, 2);
 }
+
+
 
 void YetAnotherAudioAnalyzerAudioProcessorEditor::paintSpectrumScreen(
     juce::Graphics& g, juce::Rectangle<int> area)
@@ -333,7 +306,6 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::paintLufsScreen(juce::Graphics
         juce::Justification::centredLeft);
 }
 
-
 void YetAnotherAudioAnalyzerAudioProcessorEditor::drawFrequencyOverlay(juce::Graphics& g, juce::Rectangle<int> area)
 {
     g.setColour(juce::Colours::white.withAlpha(0.5f));
@@ -391,7 +363,9 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::resized()
     // Header
     auto header = bounds.removeFromTop(viewHeaderHeight);
     int tabWidth = 120;
+    
     spectrumTab.setBounds(header.removeFromLeft(tabWidth));
+    multibandCorrelationTab.setBounds(header.removeFromLeft(tabWidth));
     stereoTab.setBounds(header.removeFromLeft(tabWidth));
     lufsTab.setBounds(header.removeFromLeft(tabWidth));
 
@@ -411,6 +385,10 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::resized()
         meterFooterArea.getY() + 10,
         buttonWidth, buttonHeight);
 
+    // meter strip
+    int levelMeterWidth = 20;
+    levelMeterArea = meterFooterArea.removeFromRight(levelMeterWidth);
+
     // Main view
     int shrinkTop = 10;
     int shrinkLeft = 0;
@@ -421,11 +399,8 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::resized()
     mainViewArea.reduce(shrinkLeft, shrinkTop);
     mainViewArea.setWidth(mainViewArea.getWidth() - shrinkRight);
     mainViewArea.setHeight(mainViewArea.getHeight() - shrinkBottom);
+    
 
-
-    // meter strip
-    int levelMeterWidth = 20;
-    levelMeterArea = meterFooterArea.removeFromRight(levelMeterWidth);
 
 }
 

@@ -1,4 +1,4 @@
-/*
+﻿/*
   ==============================================================================
 
     LevelMeter.cpp
@@ -12,6 +12,7 @@
 
 #include "LevelMeter.h"
 #include <cmath>
+#include <atomic>
 
 LevelMeter::LevelMeter()
 {
@@ -74,41 +75,51 @@ void LevelMeter::processBuffer(const juce::AudioBuffer<float>& buffer, int start
         numSamples = available - startSample;
     if (numSamples <= 0) return;
 
-    // Prepare channel pointers (treat missing channels as silence)
     std::vector<const float*> chPtrs(numChannels, nullptr);
     for (int ch = 0; ch < numChannels; ++ch)
-    {
-        if (ch < buffer.getNumChannels())
-            chPtrs[ch] = buffer.getReadPointer(ch) + startSample;
-        else
-            chPtrs[ch] = nullptr;
-    }
+        chPtrs[ch] = (ch < buffer.getNumChannels()) ? buffer.getReadPointer(ch) + startSample : nullptr;
+
+    std::vector<double> rmsSums(numChannels, 0.0);
 
     for (int i = 0; i < numSamples; ++i)
     {
         double samplePower = 0.0;
+
         for (int ch = 0; ch < numChannels; ++ch)
         {
-            float in = 0.0f;
-            if (chPtrs[ch] != nullptr)
-                in = chPtrs[ch][i];
+            float in = chPtrs[ch] ? chPtrs[ch][i] : 0.0f;
 
             float filtered = hpFilters[ch].processSingleSampleRaw(in);
             filtered = shelfFilters[ch].processSingleSampleRaw(filtered);
 
-            const double p = static_cast<double>(filtered) * static_cast<double>(filtered);
+            const double p = filtered * filtered;
             samplePower += p;
+            rmsSums[ch] += p;
         }
 
         samplePower /= static_cast<double>(numChannels);
-
         blockEnergy += samplePower;
         blockCounter++;
 
         if (blockCounter >= blockSize)
             finalizeBlock();
     }
+
+    // Update per-channel RMS and scale for visibility
+    constexpr float displayScale = 10.0f; // increase visual response
+    for (int ch = 0; ch < numChannels; ++ch)
+    {
+        float rms = static_cast<float>(std::sqrt(rmsSums[ch] / numSamples));
+        rms *= displayScale;                // scale RMS for visual feedback
+        rms = juce::jlimit(0.0f, 1.0f, rms); // clamp 0–1
+
+        if (ch == 0)
+            lastBlockRmsL.store(rms);
+        else if (ch == 1)
+            lastBlockRmsR.store(rms);
+    }
 }
+
 
 void LevelMeter::finalizeBlock()
 {
@@ -171,3 +182,4 @@ float LevelMeter::getLastBlockLufs() const noexcept
 {
     return lastBlockLufs.load(std::memory_order_relaxed);
 }
+

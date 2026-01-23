@@ -11,6 +11,7 @@
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
 #include <juce_core/juce_core.h>
+#include <iostream>
 
 //==============================================================================
 /**
@@ -53,7 +54,7 @@ private:
     float levelValue = 0.0f;
     float correlationValue = 1.0f;
     float widthValue = 0.5f;
-    float minDb = -90.0f;
+    float minDb = -60.0f;
     float maxDb = 0.0f;
 
     float leftLevel = 0.0f;
@@ -72,6 +73,16 @@ private:
 
     juce::TextButton monoButton{ "Mono" };
     juce::TextButton abButton{ "A/B" };
+
+
+    float smoothedLeft = 0.0f;
+    float smoothedRight = 0.0f;
+
+    float peakLeft = 0.0f;
+    float peakRight = 0.0f;
+     
+    const float smoothingFactor = 0.2f; // 0 = instant, 1 = no change
+    const float peakDecay = 0.01f;      // peak drops slowly
 
 
 
