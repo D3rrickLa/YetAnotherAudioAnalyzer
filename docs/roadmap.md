@@ -113,3 +113,7 @@ A UI that is dog water
 performance fixes (speed)
 Spectrum analyzer 'leveling' really weird looking with lots of info in the lows
 
+
+UPDATE 23 JAN 26
+- added GUI of the correlation and width, the width kind of wack as in it 'sends' outside the parameter box
+- the levels for the spectrum analyzer are NOT accureate because when setting the values from -90 to 0, ti says things are hitting at -60 which i know they aren't

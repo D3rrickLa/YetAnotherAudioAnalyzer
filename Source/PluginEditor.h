@@ -22,7 +22,7 @@ class YetAnotherAudioAnalyzerAudioProcessorEditor  : public juce::AudioProcessor
 {
 public:
     YetAnotherAudioAnalyzerAudioProcessorEditor (YetAnotherAudioAnalyzerAudioProcessor&);
-    ~YetAnotherAudioAnalyzerAudioProcessorEditor() override;
+    ~YetAnotherAudioAnalyzerAudioProcessorEditor() override = default;
 
     void setView(ViewMode newView);
 
@@ -34,11 +34,12 @@ public:
     void paintMeterFooter(juce::Graphics& g);
 
     void paintSpectrumScreen(juce::Graphics&, juce::Rectangle<int> area);
+    void drawFrequencyOverlay(juce::Graphics& g, juce::Rectangle<int> area);
+
     void paintMultibandScreen(juce::Graphics&, juce::Rectangle<int> area);
     void paintStereoWidthScreen(juce::Graphics&, juce::Rectangle<int> area);
     void paintLufsScreen(juce::Graphics&, juce::Rectangle<int> area);
 
-    void drawFrequencyOverlay(juce::Graphics& g, juce::Rectangle<int> area);
 
 private:
     void timerCallback();
@@ -51,18 +52,26 @@ private:
     std::vector<float> leftMagnitudes, rightMagnitudes;
     float levelValue = 0.0f;
     float correlationValue = 1.0f;
-    float widthValue = 0.0f;
-    float minDb = -60.0f;
+    float widthValue = 0.5f;
+    float minDb = -90.0f;
     float maxDb = 0.0f;
+
+    float leftLevel = 0.0f;
+    float rightLevel = 0.0f;
+
     ViewMode currentView = ViewMode::Spectrum;
 
     juce::Rectangle<int> mainViewArea;
     juce::Rectangle<int> meterFooterArea;
+    juce::Rectangle<int> levelMeterArea;
 
     juce::TextButton multibandCorrelationTab { "Multiband Correlation" };
     juce::TextButton spectrumTab{ "Spectrum" };
     juce::TextButton stereoTab{ "Stereo" };
     juce::TextButton lufsTab{ "LUFS" };
+
+    juce::TextButton monoButton{ "Mono" };
+    juce::TextButton abButton{ "A/B" };
 
 
 

@@ -16,8 +16,18 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
-constexpr int viewHeaderHeight = 60;
-constexpr int meterFooterHeight = 60;
+constexpr int viewHeaderHeight = 40;
+constexpr int meterFooterHeight = 40;
+
+float mapLufsToNormalized(float lufs)
+{
+    // clamp lufs to [-60, 0] range
+    lufs = juce::jlimit(-60.0f, 0.0f, lufs);
+
+    // map to 0 → 1 (0 = −60 LUFS, 1 = 0 LUFS)
+    return juce::jmap(lufs, -60.0f, 0.0f, 0.0f, 1.0f);
+}
+
 
 //==============================================================================
 YetAnotherAudioAnalyzerAudioProcessorEditor::YetAnotherAudioAnalyzerAudioProcessorEditor(YetAnotherAudioAnalyzerAudioProcessor& p) 
@@ -38,14 +48,17 @@ YetAnotherAudioAnalyzerAudioProcessorEditor::YetAnotherAudioAnalyzerAudioProcess
     stereoTab.onClick = [this]() { setView(ViewMode::StereoWidth); };
     lufsTab.onClick = [this]() { setView(ViewMode::AdvanceLufs); };
 
+    addAndMakeVisible(monoButton);
+    addAndMakeVisible(abButton);
+
+    monoButton.onClick = [this]() { /* toggle mono processing */ };
+    abButton.onClick = [this]() { /* trigger A/B switch */ };
+
 
     // Update GUI 30 times per second
     startTimerHz(60);
 }
 
-YetAnotherAudioAnalyzerAudioProcessorEditor::~YetAnotherAudioAnalyzerAudioProcessorEditor()
-{
-}
 
 void YetAnotherAudioAnalyzerAudioProcessorEditor::setView(ViewMode newView)
 {
@@ -58,20 +71,27 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::setView(ViewMode newView)
 
 void YetAnotherAudioAnalyzerAudioProcessorEditor::timerCallback()
 {
+    // Spectrum
     audioProcessor.getSpectrumAnalyzerL().updateSmoothedMagnitudes();
     audioProcessor.getSpectrumAnalyzerR().updateSmoothedMagnitudes();
 
-    leftMagnitudes = audioProcessor.getSpectrumAnalyzerL().getMagnitudesCopy();
+    leftMagnitudes  = audioProcessor.getSpectrumAnalyzerL().getMagnitudesCopy();
     rightMagnitudes = audioProcessor.getSpectrumAnalyzerR().getMagnitudesCopy();
 
-
-    // level: prefer integrated, otherwise last-block
+    // LUFS / level
+    float lufs = 0.0f;
     if (audioProcessor.getLevelMeter().hasIntegratedLufs())
-        levelValue = audioProcessor.getLevelMeter().getIntegratedLufs();
+        lufs = audioProcessor.getLevelMeter().getIntegratedLufs();
     else
-        levelValue = audioProcessor.getLevelMeter().getLastBlockLufs();
+        lufs = audioProcessor.getLevelMeter().getLastBlockLufs();
 
-    // correlation/width (use your existing accessors)
+    levelValue = lufs; // optional, keep for display
+
+    // Map to normalized value for vertical meters
+    leftLevel  = mapLufsToNormalized(audioProcessor.getLevelMeter().getLastBlockLufs());  // left channel approximation
+    rightLevel = mapLufsToNormalized(audioProcessor.getLevelMeter().getLastBlockLufs());  // right channel approximation
+
+    // Correlation / width
     correlationValue = audioProcessor.getCorrelationMeter().getCorrelation();
     audioProcessor.getStereoWidthMeter().getResults(correlationValue, widthValue);
 
@@ -114,73 +134,82 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::paintViewHeader(juce::Graphics
 
 void YetAnotherAudioAnalyzerAudioProcessorEditor::paintMainView(juce::Graphics& g)
 {
-    mainViewArea = juce::Rectangle<int> (
-        0,
-        viewHeaderHeight,
-        getWidth(),
-        getHeight() - viewHeaderHeight - meterFooterHeight
-    );
-
-    // Add padding (all sides)
-    int paddingLeft = 50;
-    int paddingRight = 20;
-    int paddingTop = 10;
-    int paddingBottom = 20;
-
-    juce::Rectangle<int> paddedArea = mainViewArea
-        .reduced(paddingLeft, paddingTop)
-        .withWidth(mainViewArea.getWidth() - paddingLeft - paddingRight)
-        .withHeight(mainViewArea.getHeight() - paddingTop - paddingBottom);
-    // Clip drawing to main view only
     juce::Graphics::ScopedSaveState state(g);
     g.reduceClipRegion(mainViewArea);
 
-    // Draw the active view based on current tab
     switch (currentView)
     {
-    case ViewMode::Spectrum:
-        paintSpectrumScreen(g, mainViewArea);
-        break;
-
-    case ViewMode::MultibandCorrelation:
-        paintMultibandScreen(g, mainViewArea);
-        break;
-
-    case ViewMode::StereoWidth:
-        paintStereoWidthScreen(g, mainViewArea);
-        break;
-
-    case ViewMode::AdvanceLufs:
-        paintLufsScreen(g, mainViewArea);
-        break;
+    case ViewMode::Spectrum:        paintSpectrumScreen(g, mainViewArea); break;
+    case ViewMode::StereoWidth:     paintStereoWidthScreen(g, mainViewArea); break;
+    case ViewMode::MultibandCorrelation: paintMultibandScreen(g, mainViewArea); break;
+    case ViewMode::AdvanceLufs:     paintLufsScreen(g, mainViewArea); break;
     }
 }
 
 void YetAnotherAudioAnalyzerAudioProcessorEditor::paintMeterFooter(juce::Graphics& g)
 {
-    meterFooterArea = juce::Rectangle<int>(
-        0,
-        getHeight() - meterFooterHeight,
-        getWidth(),
-        meterFooterHeight);
+    juce::Graphics::ScopedSaveState state(g);
+    g.reduceClipRegion(meterFooterArea);
 
-    g.setColour(juce::Colours::darkgrey.darker(0.4f));
+    g.setColour(juce::Colours::darkgrey.darker(0.1f));
     g.fillRect(meterFooterArea);
 
-    g.setColour(juce::Colours::white);
-    g.setFont(14.0f);
+    int meterHeight = 12;
+    int meterSpacing = 10;
+    int startX = abButton.getRight() + 20;
+    int startY = meterFooterArea.getY() + 15;
 
-    g.drawText("LUFS: " + juce::String(levelValue, 2),
-        meterFooterArea.removeFromLeft(120),
-        juce::Justification::centred);
+    // --------------------
+    // Correlation meter
+    // --------------------
+    int corrWidth = 100;
+    g.setColour(juce::Colours::grey.darker(0.5f));
+    g.fillRect(startX, startY, corrWidth, meterHeight);
 
-    g.drawText("Corr: " + juce::String(correlationValue, 2),
-        meterFooterArea.removeFromLeft(120),
-        juce::Justification::centred);
+    // Indicator
+    int indicatorX = juce::jmap(correlationValue, -1.0f, 1.0f, 0.0f, (float)corrWidth);
+    g.setColour(juce::Colours::limegreen);
+    g.fillRect(startX + indicatorX - 2, startY, 4, meterHeight);
 
-    g.drawText("Width: " + juce::String(widthValue, 2),
-        meterFooterArea.removeFromLeft(120),
-        juce::Justification::centred);
+    // --------------------
+    // Stereo width meter
+    // --------------------
+    int widthMeterX = startX + corrWidth + meterSpacing;
+    int widthMeterW = 100;
+
+    g.setColour(juce::Colours::grey.darker(0.5f));
+    g.fillRect(widthMeterX, startY, widthMeterW, meterHeight);
+
+    int fillWidth = (int)(widthValue * widthMeterW);
+    g.setColour(juce::Colours::deepskyblue);
+    g.fillRect(widthMeterX, startY, fillWidth, meterHeight);
+
+    // --------------------
+    // Level meter strip (vertical)
+    // --------------------
+    int lmX = levelMeterArea.getX();
+    int lmY = levelMeterArea.getY();
+    int lmW = levelMeterArea.getWidth();
+    int lmH = levelMeterArea.getHeight();
+
+    // Draw background
+    g.setColour(juce::Colours::grey.darker(0.5f));
+    g.fillRect(lmX, lmY, lmW, lmH);
+
+    int leftFill = int(leftLevel * levelMeterArea.getHeight());
+    int rightFill = int(rightLevel * levelMeterArea.getHeight());
+
+    g.setColour(juce::Colours::limegreen);
+    g.fillRect(levelMeterArea.getX(),
+        levelMeterArea.getBottom() - leftFill,
+        levelMeterArea.getWidth() / 2,
+        leftFill);
+
+    g.setColour(juce::Colours::deepskyblue);
+    g.fillRect(levelMeterArea.getX() + levelMeterArea.getWidth() / 2,
+        levelMeterArea.getBottom() - rightFill,
+        levelMeterArea.getWidth() / 2,
+        rightFill);
 }
 
 void YetAnotherAudioAnalyzerAudioProcessorEditor::paintSpectrumScreen(
@@ -357,36 +386,47 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::drawFrequencyOverlay(juce::Gra
 
 void YetAnotherAudioAnalyzerAudioProcessorEditor::resized()
 {
-    auto bounds = getLocalBounds(); // full editor rectangle
+    auto bounds = getLocalBounds();
 
-    // --------------------
-    // Top Tab Bar
-    // --------------------
-    auto tabBarHeight = 40;
-    auto tabBar = bounds.removeFromTop(tabBarHeight);
+    // Header
+    auto header = bounds.removeFromTop(viewHeaderHeight);
+    int tabWidth = 120;
+    spectrumTab.setBounds(header.removeFromLeft(tabWidth));
+    stereoTab.setBounds(header.removeFromLeft(tabWidth));
+    lufsTab.setBounds(header.removeFromLeft(tabWidth));
 
-    int tabWidth = 120; // fixed width per tab
-    spectrumTab.setBounds(tabBar.removeFromLeft(tabWidth));
-    multibandCorrelationTab.setBounds(tabBar.removeFromLeft(tabWidth));
-    stereoTab.setBounds(tabBar.removeFromLeft(tabWidth));
-    lufsTab.setBounds(tabBar.removeFromLeft(tabWidth));
+    // Footer
+    meterFooterArea = bounds.removeFromBottom(meterFooterHeight);
 
-    // You can leave extra tabBar space for future tabs
-    // auto extraTabSpace = tabBar; 
+    // Buttons: left-aligned in footer
+    int buttonWidth = 60;
+    int buttonHeight = 24;
+    int buttonSpacing = 10;
 
-    // --------------------
-    // Bottom Meter/Footer
-    // --------------------
-    auto footerHeight = meterFooterHeight; // use your existing constant
-    meterFooterArea = bounds.removeFromBottom(footerHeight);
-    // meterFooterArea is now available for paintMeterFooter()
+    monoButton.setBounds(meterFooterArea.getX() + 10,
+        meterFooterArea.getY() + 10,
+        buttonWidth, buttonHeight);
 
-    // --------------------
-    // Main View Area
-    // --------------------
+    abButton.setBounds(monoButton.getRight() + buttonSpacing,
+        meterFooterArea.getY() + 10,
+        buttonWidth, buttonHeight);
+
+    // Main view
+    int shrinkTop = 10;
+    int shrinkLeft = 0;
+    int shrinkRight = 0;
+    int shrinkBottom = 0;
+
     mainViewArea = bounds;
-    // everything left in "bounds" is now the main view
-    // paintMainView() will use mainViewArea
+    mainViewArea.reduce(shrinkLeft, shrinkTop);
+    mainViewArea.setWidth(mainViewArea.getWidth() - shrinkRight);
+    mainViewArea.setHeight(mainViewArea.getHeight() - shrinkBottom);
+
+
+    // meter strip
+    int levelMeterWidth = 20;
+    levelMeterArea = meterFooterArea.removeFromRight(levelMeterWidth);
+
 }
 
 float YetAnotherAudioAnalyzerAudioProcessorEditor::logX(int bin, int numBins, float width, float sampleRate)
@@ -434,3 +474,5 @@ float YetAnotherAudioAnalyzerAudioProcessorEditor::interpolateMagnitude(
     float frac = binFloat - bin0;
     return juce::jmap(frac, mags[bin0], mags[bin1]);
 }
+
+
