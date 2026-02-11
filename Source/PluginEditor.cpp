@@ -214,15 +214,15 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::paintMeterFooter(juce::Graphic
         (float)stereoFooterArea.getX(),
         (float)stereoFooterArea.getBottom());
 
-    // Draw correlation (fixed height)
+    // Correlation bar
     auto correlationArea = stereoArea.removeFromTop(14);
     drawFooterCorrelation(g, correlationArea);
 
     // Small spacer
     stereoArea.removeFromTop(8);
 
-    // Draw width in the remaining area
-    drawFooterWidth(g, stereoArea); // Use **all remaining space**
+    // Width bar: use **all remaining space**
+    drawFooterWidth(g, stereoArea);
 }
 
 
@@ -489,6 +489,7 @@ float YetAnotherAudioAnalyzerAudioProcessorEditor::interpolateMagnitude(const st
 
 void YetAnotherAudioAnalyzerAudioProcessorEditor::drawFooterWidth(juce::Graphics& g, juce::Rectangle<int> area)
 {
+
     g.setFont(12.0f);
     g.setColour(juce::Colours::white.withAlpha(0.8f));
     g.drawText("WIDTH",
@@ -496,6 +497,10 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::drawFooterWidth(juce::Graphics
         juce::Justification::centredLeft);
 
     auto barArea = area.reduced(4);
+
+    if (barArea.getWidth() <= 0 || barArea.getHeight() <= 0)
+        printf("NOTHING");
+    return; // nothing to draw
 
     g.setColour(juce::Colours::black.withAlpha(0.6f));
     g.fillRoundedRectangle(barArea.toFloat(), 3.0f);
