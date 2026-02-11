@@ -218,10 +218,6 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::paintMeterFooter(juce::Graphic
 
     drawFooterCorrelation(g, correlationArea);
     drawFooterWidth(g, widthArea);
-<<<<<<< HEAD
-=======
-
->>>>>>> 961e713 (fixed the stereo width and the main view)
 }
 
 void YetAnotherAudioAnalyzerAudioProcessorEditor::paintSpectrumScreen(juce::Graphics& g, juce::Rectangle<int> area)
@@ -538,14 +534,6 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::drawFooterWidth(juce::Graphics
 
     auto barArea = area.reduced(4);
 
-<<<<<<< HEAD
-    if (barArea.getWidth() <= 0 || barArea.getHeight() <= 0) {
-        DBG("NOTHING");
-        return; // nothing to draw
-    }
-
-=======
->>>>>>> 961e713 (fixed the stereo width and the main view)
     g.setColour(juce::Colours::black.withAlpha(0.6f));
     g.fillRoundedRectangle(barArea.toFloat(), 3.0f);
 
