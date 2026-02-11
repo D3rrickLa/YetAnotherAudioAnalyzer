@@ -214,15 +214,11 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::paintMeterFooter(juce::Graphic
         (float)stereoFooterArea.getX(),
         (float)stereoFooterArea.getBottom());
 
-    // Correlation bar
-    auto correlationArea = stereoArea.removeFromTop(14);
+    auto correlationArea = stereoArea.removeFromLeft(stereoArea.getWidth() / 2);
+    auto widthArea = stereoArea;
+
     drawFooterCorrelation(g, correlationArea);
-
-    // Small spacer
-    stereoArea.removeFromTop(8);
-
-    // Width bar: use **all remaining space**
-    drawFooterWidth(g, stereoArea);
+    drawFooterWidth(g, widthArea);
 }
 
 
@@ -498,9 +494,10 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::drawFooterWidth(juce::Graphics
 
     auto barArea = area.reduced(4);
 
-    if (barArea.getWidth() <= 0 || barArea.getHeight() <= 0)
-        printf("NOTHING");
-    return; // nothing to draw
+    if (barArea.getWidth() <= 0 || barArea.getHeight() <= 0) {
+        DBG("NOTHING");
+        return; // nothing to draw
+    }
 
     g.setColour(juce::Colours::black.withAlpha(0.6f));
     g.fillRoundedRectangle(barArea.toFloat(), 3.0f);
