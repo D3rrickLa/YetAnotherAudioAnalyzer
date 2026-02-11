@@ -93,7 +93,6 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::timerCallback()
     peakLeft = juce::jmax(peakLeft - peakDecay, smoothedLeft);
     peakRight = juce::jmax(peakRight - peakDecay, smoothedRight);
 
-
     repaint();
 }
 
@@ -150,29 +149,49 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::paintMeterFooter(juce::Graphic
     juce::Graphics::ScopedSaveState state(g);
     g.reduceClipRegion(meterFooterArea);
 
-    // Footer background
-    g.setColour(juce::Colours::darkgrey);
+    // Background
+    g.setColour(juce::Colours::darkgrey.darker(0.3f));
     g.fillRect(meterFooterArea);
+
+    // Subtle top divider
+    g.setColour(juce::Colours::black.withAlpha(0.5f));
+    g.drawLine((float)meterFooterArea.getX(),
+        (float)meterFooterArea.getY(),
+        (float)meterFooterArea.getRight(),
+        (float)meterFooterArea.getY());
+
+    // =============================
+    // LEVEL METERS
+    // =============================
 
     int lmX = levelMeterArea.getX();
     int lmY = levelMeterArea.getY();
     int lmW = levelMeterArea.getWidth();
     int lmH = levelMeterArea.getHeight();
 
-    // ---------------- Vertical level bars ----------------
     int leftFill = int(smoothedLeft * lmH);
     int rightFill = int(smoothedRight * lmH);
 
     leftFill = juce::jmax(leftFill, 2);
     rightFill = juce::jmax(rightFill, 2);
 
-    // Left channel
-    g.setColour(juce::Colours::limegreen);
-    g.fillRect(lmX, lmY + (lmH - leftFill), lmW / 2, leftFill);
+    // Background strip
+    g.setColour(juce::Colours::black.withAlpha(0.6f));
+    g.fillRect(levelMeterArea);
 
-    // Right channel
+    // Left
+    g.setColour(juce::Colours::limegreen);
+    g.fillRect(lmX,
+        lmY + (lmH - leftFill),
+        lmW / 2,
+        leftFill);
+
+    // Right
     g.setColour(juce::Colours::deepskyblue);
-    g.fillRect(lmX + lmW / 2, lmY + (lmH - rightFill), lmW / 2, rightFill);
+    g.fillRect(lmX + lmW / 2,
+        lmY + (lmH - rightFill),
+        lmW / 2,
+        rightFill);
 
     // Peaks
     int peakLeftY = lmY + (lmH - int(peakLeft * lmH));
@@ -181,6 +200,29 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::paintMeterFooter(juce::Graphic
     g.setColour(juce::Colours::yellow);
     g.fillRect(lmX, peakLeftY, lmW / 2, 2);
     g.fillRect(lmX + lmW / 2, peakRightY, lmW / 2, 2);
+
+    // =============================
+    // STEREO SECTION
+    // =============================
+
+    auto stereoArea = stereoFooterArea.reduced(10);
+
+    // Vertical divider
+    g.setColour(juce::Colours::black.withAlpha(0.5f));
+    g.drawLine((float)stereoFooterArea.getX(),
+        (float)stereoFooterArea.getY(),
+        (float)stereoFooterArea.getX(),
+        (float)stereoFooterArea.getBottom());
+
+    // Draw correlation (fixed height)
+    auto correlationArea = stereoArea.removeFromTop(14);
+    drawFooterCorrelation(g, correlationArea);
+
+    // Small spacer
+    stereoArea.removeFromTop(8);
+
+    // Draw width in the remaining area
+    drawFooterWidth(g, stereoArea); // Use **all remaining space**
 }
 
 
@@ -292,10 +334,7 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::paintMultibandScreen(juce::Gra
 
 void YetAnotherAudioAnalyzerAudioProcessorEditor::paintStereoWidthScreen(juce::Graphics& g, juce::Rectangle<int> area)
 {
-    g.setColour(juce::Colours::white);
-    g.drawText("Stereo Width screen (WIP)",
-        area.reduced(20),
-        juce::Justification::centredLeft);
+
 }
 
 void YetAnotherAudioAnalyzerAudioProcessorEditor::paintLufsScreen(juce::Graphics& g, juce::Rectangle<int> area)
@@ -344,7 +383,9 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::drawFrequencyOverlay(juce::Gra
     {
         float xNorm = (std::log10(f) - logMin) / (logMax - logMin);
         float x = plotArea.getX() + xNorm * plotArea.getWidth();
-        float labelX = juce::jlimit(plotArea.getX(), plotArea.getRight() - 36.0f, x - 18.0f);
+        float xMin = plotArea.getX();
+        float xMax = juce::jmax(plotArea.getRight() - 36.0f, xMin); // never less than min
+        float labelX = juce::jlimit(xMin, xMax, x - 18.0f);
 
         g.drawLine(x, plotArea.getY(), x, plotArea.getBottom(), 1.0f);
 
@@ -372,33 +413,33 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::resized()
     // Footer
     meterFooterArea = bounds.removeFromBottom(meterFooterHeight);
 
-    // Buttons: left-aligned in footer
-    int buttonWidth = 60;
-    int buttonHeight = 24;
-    int buttonSpacing = 10;
+    // Work on a copy for slicing
+    auto footerLayout = meterFooterArea;
 
-    monoButton.setBounds(meterFooterArea.getX() + 10,
-        meterFooterArea.getY() + 10,
-        buttonWidth, buttonHeight);
+    // Rightmost: vertical level meter strip
+    const int levelMeterWidth = 20;
+    levelMeterArea = footerLayout.removeFromRight(levelMeterWidth);
 
-    abButton.setBounds(monoButton.getRight() + buttonSpacing,
-        meterFooterArea.getY() + 10,
-        buttonWidth, buttonHeight);
+    // Stereo section (left of level meter)
+    const int stereoWidth = 240;
+    stereoFooterArea = footerLayout.removeFromRight(stereoWidth);
 
-    // meter strip
-    int levelMeterWidth = 20;
-    levelMeterArea = meterFooterArea.removeFromRight(levelMeterWidth);
+    // Buttons on left side
+    const int buttonWidth = 60;
+    const int buttonHeight = 24;
+    const int buttonSpacing = 10;
 
-    // Main view
-    int shrinkTop = 10;
-    int shrinkLeft = 0;
-    int shrinkRight = 0;
-    int shrinkBottom = 0;
+    monoButton.setBounds(
+        footerLayout.getX() + 10,
+        footerLayout.getCentreY() - buttonHeight / 2,
+        buttonWidth,
+        buttonHeight);
 
-    mainViewArea = bounds;
-    mainViewArea.reduce(shrinkLeft, shrinkTop);
-    mainViewArea.setWidth(mainViewArea.getWidth() - shrinkRight);
-    mainViewArea.setHeight(mainViewArea.getHeight() - shrinkBottom);
+    abButton.setBounds(
+        monoButton.getRight() + buttonSpacing,
+        footerLayout.getCentreY() - buttonHeight / 2,
+        buttonWidth,
+        buttonHeight);
     
 
 
@@ -419,8 +460,7 @@ float YetAnotherAudioAnalyzerAudioProcessorEditor::logX(int bin, int numBins, fl
     return ((logFreq - logMin) / (logMax - logMin)) * width;
 }
 
-float YetAnotherAudioAnalyzerAudioProcessorEditor::xToFrequency(
-    float xNorm) const
+float YetAnotherAudioAnalyzerAudioProcessorEditor::xToFrequency(float xNorm) const
 {
     const float minFreq = 20.0f;
     const float maxFreq = audioProcessor.getSampleRate() * 0.5f;
@@ -432,10 +472,7 @@ float YetAnotherAudioAnalyzerAudioProcessorEditor::xToFrequency(
     return std::pow(10.0f, logFreq);
 }
 
-float YetAnotherAudioAnalyzerAudioProcessorEditor::interpolateMagnitude(
-    const std::vector<float>& mags,
-    float freq,
-    float sampleRate)
+float YetAnotherAudioAnalyzerAudioProcessorEditor::interpolateMagnitude(const std::vector<float>& mags, float freq,float sampleRate)
 {
     if (mags.empty()) return 0.0f;
 
@@ -449,5 +486,78 @@ float YetAnotherAudioAnalyzerAudioProcessorEditor::interpolateMagnitude(
     float frac = binFloat - bin0;
     return juce::jmap(frac, mags[bin0], mags[bin1]);
 }
+
+void YetAnotherAudioAnalyzerAudioProcessorEditor::drawFooterWidth(juce::Graphics& g, juce::Rectangle<int> area)
+{
+    g.setFont(12.0f);
+    g.setColour(juce::Colours::white.withAlpha(0.8f));
+    g.drawText("WIDTH",
+        area.removeFromLeft(45),
+        juce::Justification::centredLeft);
+
+    auto barArea = area.reduced(4);
+
+    g.setColour(juce::Colours::black.withAlpha(0.6f));
+    g.fillRoundedRectangle(barArea.toFloat(), 3.0f);
+
+    float normalized = juce::jlimit(0.0f, 1.0f, widthValue);
+
+    juce::Rectangle<float> fill = barArea.toFloat();
+    fill.setWidth(fill.getWidth() * normalized);
+
+    juce::Colour colour = juce::Colours::deepskyblue;
+
+    if (widthValue < 0.2f)
+        colour = juce::Colours::red;
+
+    g.setColour(colour);
+    g.fillRoundedRectangle(fill, 3.0f);
+}
+
+
+void YetAnotherAudioAnalyzerAudioProcessorEditor::drawFooterCorrelation(juce::Graphics& g, juce::Rectangle<int> area)
+{
+    g.setFont(12.0f);
+    g.setColour(juce::Colours::white.withAlpha(0.8f));
+    g.drawText("CORR", area.removeFromLeft(45), juce::Justification::centredLeft);
+
+    auto barArea = area.reduced(4);
+
+    // Background
+    g.setColour(juce::Colours::black.withAlpha(0.6f));
+    g.fillRoundedRectangle(barArea.toFloat(), 3.0f);
+
+    float centreX = (float)barArea.getCentreX();
+    float halfWidth = barArea.getWidth() * 0.5f;
+
+    float clamped = juce::jlimit(-1.0f, 1.0f, correlationValue);
+
+    float fillWidth = halfWidth * std::abs(clamped);
+
+    juce::Rectangle<float> fillRect;
+
+    if (clamped >= 0.0f)
+        fillRect = { centreX, (float)barArea.getY(), fillWidth, (float)barArea.getHeight() };
+    else
+        fillRect = { centreX - fillWidth, (float)barArea.getY(), fillWidth, (float)barArea.getHeight() };
+
+    // Colour logic
+    juce::Colour colour = juce::Colours::limegreen;
+
+    if (clamped < 0.0f)
+        colour = juce::Colours::red;
+    else if (clamped < 0.3f)
+        colour = juce::Colours::orange;
+
+    g.setColour(colour);
+    g.fillRoundedRectangle(fillRect, 3.0f);
+
+    // Center line
+    g.setColour(juce::Colours::white.withAlpha(0.4f));
+    g.drawVerticalLine((int)centreX,
+        (float)barArea.getY(),
+        (float)barArea.getBottom());
+}
+
 
 

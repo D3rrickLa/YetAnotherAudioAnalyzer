@@ -47,6 +47,8 @@ private:
     float logX(int bin, int numBins, float width, float sampleRate);
     float xToFrequency(float xNorm) const;
     float interpolateMagnitude(const std::vector<float>& mags, float freq, float sampleRate);
+    void drawFooterWidth(juce::Graphics& g, juce::Rectangle<int> area);
+    void drawFooterCorrelation(juce::Graphics& g, juce::Rectangle<int> area);
     YetAnotherAudioAnalyzerAudioProcessor& audioProcessor;
 
     // Basic values from meters
@@ -65,6 +67,7 @@ private:
     juce::Rectangle<int> mainViewArea;
     juce::Rectangle<int> meterFooterArea;
     juce::Rectangle<int> levelMeterArea;
+    juce::Rectangle<int> stereoFooterArea;
 
     juce::TextButton multibandCorrelationTab { "Multiband Correlation" };
     juce::TextButton spectrumTab{ "Spectrum" };

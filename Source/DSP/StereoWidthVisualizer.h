@@ -34,4 +34,7 @@ private:
     double sumS = 0.0;
 
     int sampleCount = 0;
+
+    float smoothedCorrelation = 1.0f;
+    float smoothedWidth = 0.0f;
 };

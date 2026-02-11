@@ -55,30 +55,53 @@ void StereoWidthVisualizer::processBlock(const juce::AudioBuffer<float>& buffer)
 
 void StereoWidthVisualizer::getResults(float& correlationOut, float& widthOut)
 {
-    if (sampleCount == 0)
+    if (sampleCount <= 0)
     {
         correlationOut = 1.0f;
         widthOut = 0.0f;
         return;
     }
 
-    // ===== Correlation (–1 to +1) =====
-    const double denom = std::sqrt(sumL * sumR);
-    float corr = (denom > 0.0)
-        ? (float)(sumLR / denom)
-        : 1.0f;
+    // ===== Safe correlation =====
+    double product = sumL * sumR;
+
+    float corr = 1.0f;
+
+    if (product > 0.0)
+    {
+        double denom = std::sqrt(product);
+
+        if (denom > 0.0)
+            corr = (float)(sumLR / denom);
+    }
+
+    if (!std::isfinite(corr))
+        corr = 1.0f;
 
     corr = juce::jlimit(-1.0f, 1.0f, corr);
 
-    // ===== Width based on MS energy ratio =====
-    const float rmsM = std::sqrt((float)(sumM / sampleCount));
-    const float rmsS = std::sqrt((float)(sumS / sampleCount));
+    // ===== Safe width =====
+    float rmsM = 0.0f;
+    float rmsS = 0.0f;
 
-    float width = (rmsM > 0.0f ? rmsS / rmsM : 0.0f);
-    width = juce::jlimit(0.0f, 2.0f, width);  // typical normalized range
+    if (sumM > 0.0)
+        rmsM = std::sqrt((float)(sumM / sampleCount));
+
+    if (sumS > 0.0)
+        rmsS = std::sqrt((float)(sumS / sampleCount));
+
+    float width = 0.0f;
+
+    if (rmsM > 0.000001f)
+        width = rmsS / rmsM;
+
+    if (!std::isfinite(width))
+        width = 0.0f;
+
+    width = juce::jlimit(0.0f, 2.0f, width);
 
     correlationOut = corr;
     widthOut = width;
 
-    reset(); // Clear for next visual frame
+    reset();
 }
