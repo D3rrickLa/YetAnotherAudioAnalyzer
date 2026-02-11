@@ -330,10 +330,50 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::paintMultibandScreen(juce::Gra
 
 void YetAnotherAudioAnalyzerAudioProcessorEditor::paintStereoWidthScreen(juce::Graphics& g, juce::Rectangle<int> area)
 {
-    g.setColour(juce::Colours::white);
-    g.drawText("Stereo Width screen (WIP)",
-        area.reduced(20),
-        juce::Justification::centredLeft);
+    g.setColour(juce::Colours::black);
+    g.fillRect(area);
+
+    auto bounds = area.reduced(20);
+    auto center = bounds.getCentre().toFloat();
+
+    float size = (float)juce::jmin(bounds.getWidth(), bounds.getHeight()) * 0.5f;
+
+    // =============================
+    // Draw Diamond Grid
+    // =============================
+    g.setColour(juce::Colours::white.withAlpha(0.15f));
+
+    juce::Path diamond;
+    diamond.startNewSubPath(center.x, center.y - size);
+    diamond.lineTo(center.x + size, center.y);
+    diamond.lineTo(center.x, center.y + size);
+    diamond.lineTo(center.x - size, center.y);
+    diamond.closeSubPath();
+
+    g.strokePath(diamond, juce::PathStrokeType(1.0f));
+
+    // Cross lines
+    g.drawLine(center.x - size, center.y,
+        center.x + size, center.y);
+
+    g.drawLine(center.x,
+        center.y - size,
+        center.x,
+        center.y + size);
+
+    // =============================
+    // Draw Stereo Points
+    // =============================
+
+    g.setColour(juce::Colours::deepskyblue.withAlpha(0.4f));
+
+    for (auto& p : stereoScopePoints)
+    {
+        float x = center.x + p.x * size * 2.0f;
+        float y = center.y - p.y * size * 2.0f;
+
+        g.fillEllipse(x, y, 2.0f, 2.0f);
+    }
 }
 
 void YetAnotherAudioAnalyzerAudioProcessorEditor::paintLufsScreen(juce::Graphics& g, juce::Rectangle<int> area)

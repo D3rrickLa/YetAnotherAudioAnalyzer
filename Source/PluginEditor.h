@@ -79,7 +79,7 @@ private:
     juce::TextButton abButton{ "A/B" };
 
     std::vector<juce::Point<float>> stereoScopePoints;
-z
+
     float smoothedLeft = 0.0f;
     float smoothedRight = 0.0f;
 
