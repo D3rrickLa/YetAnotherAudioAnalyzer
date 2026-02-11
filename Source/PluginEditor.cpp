@@ -112,7 +112,6 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::paint(juce::Graphics& g)
     highlightTab(stereoTab, ViewMode::StereoWidth);
     highlightTab(lufsTab, ViewMode::AdvanceLufs);
 
-
     paintViewHeader(g);
     paintMainView(g);
     paintMeterFooter(g);
@@ -219,12 +218,13 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::paintMeterFooter(juce::Graphic
 
     drawFooterCorrelation(g, correlationArea);
     drawFooterWidth(g, widthArea);
+<<<<<<< HEAD
+=======
+
+>>>>>>> 961e713 (fixed the stereo width and the main view)
 }
 
-
-
-void YetAnotherAudioAnalyzerAudioProcessorEditor::paintSpectrumScreen(
-    juce::Graphics& g, juce::Rectangle<int> area)
+void YetAnotherAudioAnalyzerAudioProcessorEditor::paintSpectrumScreen(juce::Graphics& g, juce::Rectangle<int> area)
 {
     const auto& magsL = leftMagnitudes;
     const auto& magsR = rightMagnitudes;
@@ -330,7 +330,10 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::paintMultibandScreen(juce::Gra
 
 void YetAnotherAudioAnalyzerAudioProcessorEditor::paintStereoWidthScreen(juce::Graphics& g, juce::Rectangle<int> area)
 {
-
+    g.setColour(juce::Colours::white);
+    g.drawText("Stereo Width screen (WIP)",
+        area.reduced(20),
+        juce::Justification::centredLeft);
 }
 
 void YetAnotherAudioAnalyzerAudioProcessorEditor::paintLufsScreen(juce::Graphics& g, juce::Rectangle<int> area)
@@ -437,6 +440,7 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::resized()
         buttonWidth,
         buttonHeight);
     
+    mainViewArea = bounds.reduced(10); // clean margin
 
 
 }
@@ -494,11 +498,14 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::drawFooterWidth(juce::Graphics
 
     auto barArea = area.reduced(4);
 
+<<<<<<< HEAD
     if (barArea.getWidth() <= 0 || barArea.getHeight() <= 0) {
         DBG("NOTHING");
         return; // nothing to draw
     }
 
+=======
+>>>>>>> 961e713 (fixed the stereo width and the main view)
     g.setColour(juce::Colours::black.withAlpha(0.6f));
     g.fillRoundedRectangle(barArea.toFloat(), 3.0f);
 
@@ -515,7 +522,6 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::drawFooterWidth(juce::Graphics
     g.setColour(colour);
     g.fillRoundedRectangle(fill, 3.0f);
 }
-
 
 void YetAnotherAudioAnalyzerAudioProcessorEditor::drawFooterCorrelation(juce::Graphics& g, juce::Rectangle<int> area)
 {
@@ -561,5 +567,30 @@ void YetAnotherAudioAnalyzerAudioProcessorEditor::drawFooterCorrelation(juce::Gr
         (float)barArea.getBottom());
 }
 
+void YetAnotherAudioAnalyzerAudioProcessorEditor::updateStereoScope(
+    const juce::AudioBuffer<float>& buffer)
+{
+    stereoScopePoints.clear();
+
+    if (buffer.getNumChannels() < 2)
+        return;
+
+    auto* L = buffer.getReadPointer(0);
+    auto* R = buffer.getReadPointer(1);
+    int N = buffer.getNumSamples();
+
+    const int step = 4; // downsample for performance
+
+    for (int i = 0; i < N; i += step)
+    {
+        float l = L[i];
+        float r = R[i];
+
+        float mid = 0.5f * (l + r);
+        float side = 0.5f * (l - r);
+
+        stereoScopePoints.emplace_back(side, mid);
+    }
+}
 
 

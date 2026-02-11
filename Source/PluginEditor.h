@@ -49,6 +49,7 @@ private:
     float interpolateMagnitude(const std::vector<float>& mags, float freq, float sampleRate);
     void drawFooterWidth(juce::Graphics& g, juce::Rectangle<int> area);
     void drawFooterCorrelation(juce::Graphics& g, juce::Rectangle<int> area);
+    void updateStereoScope(const juce::AudioBuffer<float>& buffer);
     YetAnotherAudioAnalyzerAudioProcessor& audioProcessor;
 
     // Basic values from meters
@@ -77,7 +78,8 @@ private:
     juce::TextButton monoButton{ "Mono" };
     juce::TextButton abButton{ "A/B" };
 
-
+    std::vector<juce::Point<float>> stereoScopePoints;
+z
     float smoothedLeft = 0.0f;
     float smoothedRight = 0.0f;
 
